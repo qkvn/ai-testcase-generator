@@ -24,19 +24,19 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable()) // Tắt CSRF để React gọi API dễ dàng
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/user/me").permitAll() // Tránh vòng lặp redirect
-                        .anyRequest().authenticated() // Mọi request khác đều phải đăng nhập
+                        // BẮT BUỘC: Mở khóa các endpoint hệ thống và OAuth2
+                        .requestMatchers("/", "/error", "/login**", "/oauth2/**", "/api/user/me").permitAll()
+                        .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                         )
-                        // Đăng nhập thành công thì quay lại trang React
+                        // Đăng nhập thành công trả về Frontend
                         .defaultSuccessUrl("http://localhost:5173", true)
                 )
                 .logout(logout -> logout
                         .logoutUrl("/api/logout")
-                        // Đăng xuất xong đá về trang React
                         .logoutSuccessUrl("http://localhost:5173")
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID")
@@ -47,6 +47,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        // SAU NÀY: Hãy đổi localhost thành link Vercel khi bạn deploy Frontend lên mạng
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowCredentials(true);
