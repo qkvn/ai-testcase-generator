@@ -21,7 +21,7 @@ public class TestCaseService {
     private final TestCaseRepository testCaseRepository;
     private final ChatSessionRepository chatSessionRepository;
 
-    private final String API_KEY = "YOUR_GROQ_API_KEY";
+    private final String API_KEY = "YOUR_GROQ_API_KEY"; // Replace with your actual API key
 
     public TestCaseService(TestCaseRepository testCaseRepository, ChatSessionRepository chatSessionRepository) {
         this.testCaseRepository = testCaseRepository;
