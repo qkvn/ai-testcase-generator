@@ -32,12 +32,13 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                         )
-                        // Đăng nhập thành công trả về Frontend
-                        .defaultSuccessUrl("http://localhost:5173", true)
+                        // Đăng nhập thành công: Dùng đường dẫn tương đối "/" để tự động nhận diện tên miền (localhost hoặc Render)
+                        .defaultSuccessUrl("/", true)
                 )
                 .logout(logout -> logout
                         .logoutUrl("/api/logout")
-                        .logoutSuccessUrl("http://localhost:5173")
+                        // Đăng xuất thành công: Trở về trang chủ "/"
+                        .logoutSuccessUrl("/")
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID")
                 );
@@ -47,11 +48,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // SAU NÀY: Hãy đổi localhost thành link Vercel khi bạn deploy Frontend lên mạng
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        
+        // Hỗ trợ đồng thời cả Localhost (khi code máy cá nhân) và Render (khi chạy online)
+        configuration.setAllowedOrigins(List.of(
+            "http://localhost:5173", 
+            "https://ai-testcase-generator-1j9g.onrender.com"
+        ));
+        
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowCredentials(true);
         configuration.setAllowedHeaders(List.of("*"));
+        
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
