@@ -7,6 +7,9 @@ import autoTable from "jspdf-autotable";
 
 axios.defaults.withCredentials = true;
 
+// Xác định môi trường: Trống nếu chạy trên Render, dùng localhost nếu chạy dưới máy.
+const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8080' : '';
+
 const translations = {
   vi: {
     title: "Hệ Thống Tự Động Sinh Test Case",
@@ -87,7 +90,6 @@ function App() {
   const [shareModalSession, setShareModalSession] = useState(null);
   const [isSharedView, setIsSharedView] = useState(false);
 
-  // States cho tính năng Inline Edit
   const [editingCell, setEditingCell] = useState({ id: null, field: null });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -100,7 +102,7 @@ function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await axios.get('http://localhost:8080/api/user/me');
+        const res = await axios.get(API_BASE_URL + '/api/user/me');
         setCurrentUser(res.data);
       } catch (err) {
         setCurrentUser(null);
@@ -111,8 +113,8 @@ function App() {
     checkAuth();
   }, []);
 
-  const handleLogin = () => { window.location.href = 'http://localhost:8080/oauth2/authorization/google'; };
-  const handleLogout = () => { window.location.href = 'http://localhost:8080/api/logout'; };
+  const handleLogin = () => { window.location.href = API_BASE_URL + '/oauth2/authorization/google'; };
+  const handleLogout = () => { window.location.href = API_BASE_URL + '/api/logout'; };
 
   const filteredHistory = chatSessions.filter(item =>
     item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -120,7 +122,7 @@ function App() {
 
   const fetchSessions = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/api/sessions');
+      const res = await axios.get(API_BASE_URL + '/api/sessions');
       setChatSessions(res.data);
     } catch (err) {
       console.error('Lỗi khi tải lịch sử:', err);
@@ -166,7 +168,7 @@ function App() {
     setError('');
     setHasUnsavedChanges(false);
     try {
-      const res = await axios.get(`http://localhost:8080/api/sessions/${sessionId}/testcases`);
+      const res = await axios.get(API_BASE_URL + '/api/sessions/' + sessionId + '/testcases');
       setTestCases(res.data);
     } catch (err) {
       setError("Lỗi tải test case: " + (err.response?.data?.message || err.message));
@@ -191,7 +193,7 @@ function App() {
     }
     setError(''); setLoading(true);
     try {
-      const res = await axios.post(`http://localhost:8080/api/generate?lang=${language}`, userStory, {
+      const res = await axios.post(API_BASE_URL + '/api/generate?lang=' + language, userStory, {
         headers: { 'Content-Type': 'text/plain' }
       });
       setTestCases(res.data);
@@ -215,7 +217,7 @@ function App() {
   const handleSaveRename = async (sessionId) => {
     if (!editTitle.trim()) { setEditingSessionId(null); return; }
     try {
-      await axios.put(`http://localhost:8080/api/sessions/${sessionId}/rename`, editTitle, { headers: { 'Content-Type': 'text/plain' } });
+      await axios.put(API_BASE_URL + '/api/sessions/' + sessionId + '/rename', editTitle, { headers: { 'Content-Type': 'text/plain' } });
       await fetchSessions();
       setEditingSessionId(null);
     } catch (err) {
@@ -226,7 +228,7 @@ function App() {
   const handleDeleteSession = async (sessionId) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa lịch sử này không?")) return;
     try {
-      await axios.delete(`http://localhost:8080/api/sessions/${sessionId}`);
+      await axios.delete(API_BASE_URL + '/api/sessions/' + sessionId);
       await fetchSessions();
       if (activeSessionId === sessionId) handleNewChat();
       setActiveMenuId(null);
@@ -237,7 +239,7 @@ function App() {
 
   const handleTogglePin = async (session) => {
     try {
-      await axios.put(`http://localhost:8080/api/sessions/${session.id}/pin`);
+      await axios.put(API_BASE_URL + '/api/sessions/' + session.id + '/pin');
       await fetchSessions();
       setActiveMenuId(null);
     } catch (err) {
@@ -246,15 +248,14 @@ function App() {
   };
 
   const handleCopyLink = () => {
-    const shareUrl = `${window.location.origin}/?share=${shareModalSession.id}`;
+    const shareUrl = window.location.origin + '/?share=' + shareModalSession.id;
     navigator.clipboard.writeText(shareUrl).then(() => {
       alert("Đã sao chép đường liên kết vào khay nhớ tạm!");
     });
   };
 
-  // --- LOGIC INLINE EDIT ---
   const handleDoubleClickCell = (id, field) => {
-    if (isSharedView) return; // Không cho sửa nếu là người lạ đang xem
+    if (isSharedView) return; 
     setEditingCell({ id, field });
   };
 
@@ -262,7 +263,6 @@ function App() {
     setTestCases(prev => prev.map(tc => {
       if (tc.id === id) {
         let newValue = value;
-        // Nếu là mảng steps, tách bằng dấu xuống dòng
         if (field === 'steps') newValue = value.split('\n').filter(s => s.trim() !== '');
         return { ...tc, [field]: newValue };
       }
@@ -274,11 +274,9 @@ function App() {
   const handleSaveChangesDB = async () => {
       setLoading(true);
       try {
-        // Gửi toàn bộ test cases hiện tại lên API để cập nhật
         await Promise.all(testCases.map(tc => {
-          // Sử dụng dbId (khóa chính dạng số trong Database) thay vì id (dạng chữ "TC01")
           const targetId = tc.dbId ? tc.dbId : tc.id;
-          return axios.put(`http://localhost:8080/api/testcases/${targetId}`, tc);
+          return axios.put(API_BASE_URL + '/api/testcases/' + targetId, tc);
         }));
         setHasUnsavedChanges(false);
         alert(t.saveSuccess);
@@ -358,7 +356,7 @@ function App() {
   const handleSidebarExportExcel = async (session) => {
     setActiveMenuId(null);
     try {
-      const res = await axios.get(`http://localhost:8080/api/sessions/${session.id}/testcases`);
+      const res = await axios.get(API_BASE_URL + '/api/sessions/' + session.id + '/testcases');
       let safeTitle = session.title.replace(/[\/\\?%*:|"<>]/g, '-').substring(0, 30);
       generateFormattedExcel(res.data, safeTitle);
     } catch (err) { alert("Lỗi tải dữ liệu: " + (err.response?.data?.message || err.message)); }
@@ -367,7 +365,7 @@ function App() {
   const handleSidebarExportPDF = async (session) => {
     setActiveMenuId(null);
     try {
-      const res = await axios.get(`http://localhost:8080/api/sessions/${session.id}/testcases`);
+      const res = await axios.get(API_BASE_URL + '/api/sessions/' + session.id + '/testcases');
       const data = res.data;
       if (!data || data.length === 0) { alert("Không có dữ liệu để xuất PDF!"); return; }
       const doc = new jsPDF({ orientation: "landscape" });
@@ -449,7 +447,7 @@ function App() {
             <h3 style={{ marginTop: 0, marginBottom: '24px', fontSize: '20px', fontWeight: 500, color: '#e8eaed' }}>Đường liên kết công khai có thể chia sẻ</h3>
             <div style={{ display: 'flex', backgroundColor: '#303134', borderRadius: '24px', padding: '6px 6px 6px 20px', alignItems: 'center', border: '1px solid #5f6368' }}>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '15px', color: '#e8eaed', userSelect: 'all' }}>
-                {`${window.location.origin}/?share=${shareModalSession.id}`}
+                {window.location.origin + '/?share=' + shareModalSession.id}
               </span>
               <button onClick={handleCopyLink} style={{ backgroundColor: '#8ab4f8', color: '#202124', border: 'none', borderRadius: '20px', padding: '10px 20px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', marginLeft: '12px', display: 'flex', alignItems: 'center' }}>
                 <span style={{ marginRight: '6px', fontSize: '16px' }}>⧉</span> Sao chép
