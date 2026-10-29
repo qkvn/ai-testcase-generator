@@ -22,16 +22,16 @@ spring.datasource.url=jdbc:mysql://localhost:3306/datn_db?useSSL=false&serverTim
 spring.datasource.username=root
 spring.datasource.password=mat_khau_mysql_cua_ban
 2. Cấu hình Google OAuth2
-Lấy Client ID và Client Secret từ Google Cloud Console (cấu hình Authorized redirect URIs là http://localhost:8080/login/oauth2/code/google).
+Lấy Client ID và Client Secret từ Google Cloud Console cấu hình Authorized redirect URIs là https://console.cloud.google.com/apis/credentials.
 
 Cập nhật vào file application.properties: spring.security.oauth2.client.registration.google.client-id=YOUR_CLIENT_ID spring.security.oauth2.client.registration.google.client-secret=YOUR_CLIENT_SECRET
 
 3. Khởi chạy Backend (Spring Boot)
-Mở thư mục demo bằng IntelliJ IDEA (Chỉ mở thư mục demo, không mở thư mục gốc để tránh nặng máy).
+Mở thư mục demo bằng Visual code (Chỉ mở thư mục demo, không mở thư mục gốc để tránh nặng máy).
 
-Chạy class DemoApplication.java để khởi động máy chủ tại http://localhost:8080.
+Chạy lệnh .\mvnw spring-boot:run để khởi động máy chủ tại http://localhost:8080.
 
 4. Khởi chạy Frontend (React)
 Mở thư mục frontend bằng VS Code.
 
-Mở Terminal và chạy các lệnh: npm install npm run dev Truy cập ứng dụng trên trình duyệt tại: http://localhost:5173
+Mở Terminal và chạy các lệnh: npm install hoặc npm run dev Truy cập ứng dụng trên trình duyệt tại: http://localhost:5173
