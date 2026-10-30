@@ -42,12 +42,13 @@ public class TestCaseService {
                 + languageInstruction;
 
         Map<String, Object> requestBody = Map.of(
-                "model", "openai/gpt-oss-20b",
+                "model", "mixtral-8x7b-32768", // Cập nhật sang model tiêu chuẩn và mạnh mẽ của Groq
                 "messages", List.of(
                         Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", userStory)
                 ),
-                "temperature", 0.2
+                "temperature", 0.2,
+                "max_tokens", 4000 // Ép mức giới hạn từ khóa cao để không bị đứt đoạn giữa chừng
         );
 
         try {
@@ -75,9 +76,19 @@ public class TestCaseService {
             JsonNode rootNode = mapper.readTree(rawResponse);
             String cleanJsonContent = rootNode.path("choices").get(0).path("message").path("content").asText();
 
+            // 3. THUẬT TOÁN DỌN DẸP DỮ LIỆU JSON
+            // Lọc bỏ ký tự markdown thừa
+            cleanJsonContent = cleanJsonContent.replace("```json", "").replace("```", "").trim();
+            // Gắp chính xác nội dung mảng JSON từ dấu [ đến dấu ]
+            int firstBracket = cleanJsonContent.indexOf("[");
+            int lastBracket = cleanJsonContent.lastIndexOf("]");
+            if (firstBracket != -1 && lastBracket != -1) {
+                cleanJsonContent = cleanJsonContent.substring(firstBracket, lastBracket + 1);
+            }
+
             List<TestCase> testCases = mapper.readValue(cleanJsonContent, new TypeReference<List<TestCase>>() {});
 
-            // 3. GẮN TEST CASE VÀO LỊCH SỬ VỪA TẠO
+            // 4. GẮN TEST CASE VÀO LỊCH SỬ VỪA TẠO
             for (TestCase tc : testCases) {
                 tc.setChatSession(savedSession);
             }
