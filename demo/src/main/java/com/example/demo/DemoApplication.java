@@ -19,8 +19,9 @@ public class DemoApplication {
     @PostConstruct
     public void forceCreateDatabaseTables() {
         try {
-            // Ép MySQL tạo bảng test_case_steps trực tiếp bằng SQL nếu nó chưa tồn tại
+            // Đã thêm 'id BIGINT AUTO_INCREMENT PRIMARY KEY' để vượt qua lớp bảo vệ của Aiven
             jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS test_case_steps (" +
+                                 "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
                                  "test_case_db_id BIGINT NOT NULL, " +
                                  "step_description TEXT" +
                                  ")");
