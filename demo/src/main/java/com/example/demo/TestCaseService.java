@@ -3,6 +3,8 @@ package com.example.demo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -18,12 +20,19 @@ import java.util.Map;
 @Service
 public class TestCaseService {
 
+    private static final Logger log = LoggerFactory.getLogger(TestCaseService.class);
+
     private final WebClient webClient;
     private final TestCaseRepository testCaseRepository;
     private final ChatSessionRepository chatSessionRepository;
 
     @Value("${GROQ_API_KEY}")
     private String API_KEY;
+
+    // Tên model đọc từ biến môi trường GROQ_MODEL (đặt trên Render).
+    // Nếu không đặt thì dùng giá trị mặc định phía sau dấu ":".
+    @Value("${GROQ_MODEL:openai/gpt-oss-120b}")
+    private String model;
 
     public TestCaseService(TestCaseRepository testCaseRepository, ChatSessionRepository chatSessionRepository) {
         this.testCaseRepository = testCaseRepository;
@@ -42,24 +51,17 @@ public class TestCaseService {
                 + languageInstruction;
 
         Map<String, Object> requestBody = Map.of(
-                "model", "mixtral-8x7b-32768", // Cập nhật sang model tiêu chuẩn và mạnh mẽ của Groq
+                "model", model,
                 "messages", List.of(
                         Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", userStory)
                 ),
                 "temperature", 0.2,
-                "max_tokens", 4000 // Ép mức giới hạn từ khóa cao để không bị đứt đoạn giữa chừng
+                "max_tokens", 6000 // Đủ chỗ để không bị đứt giữa chừng (kể cả model có bước suy luận)
         );
 
         try {
-            // 1. TẠO VÀ LƯU LỊCH SỬ (SESSION)
-            ChatSession session = new ChatSession();
-            String title = userStory.length() > 35 ? userStory.substring(0, 35) + "..." : userStory;
-            session.setTitle(title);
-            session.setUser(currentUser);
-            ChatSession savedSession = chatSessionRepository.save(session);
-
-            // 2. GỌI API GROQ
+            // 1. GỌI API GROQ (gọi trước, thành công mới lưu lịch sử để khỏi tạo phiên rỗng khi lỗi)
             ObjectMapper mapper = new ObjectMapper();
             String jsonString = mapper.writeValueAsString(requestBody);
 
@@ -70,13 +72,18 @@ public class TestCaseService {
                     .bodyValue(jsonString)
                     .retrieve()
                     .bodyToMono(String.class)
-                    .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(2)))
+                    // Chỉ thử lại khi lỗi tạm thời (429 hoặc 5xx). Lỗi 400/401/404 thử lại cũng vô ích.
+                    .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(2))
+                            .filter(ex -> ex instanceof WebClientResponseException w
+                                    && (w.getStatusCode().value() == 429 || w.getStatusCode().is5xxServerError()))
+                            // Hết lượt thử thì ném lại lỗi gốc, không ném "Retries exhausted" nữa
+                            .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
                     .block();
 
             JsonNode rootNode = mapper.readTree(rawResponse);
             String cleanJsonContent = rootNode.path("choices").get(0).path("message").path("content").asText();
 
-            // 3. THUẬT TOÁN DỌN DẸP DỮ LIỆU JSON
+            // 2. THUẬT TOÁN DỌN DẸP DỮ LIỆU JSON
             // Lọc bỏ ký tự markdown thừa
             cleanJsonContent = cleanJsonContent.replace("```json", "").replace("```", "").trim();
             // Gắp chính xác nội dung mảng JSON từ dấu [ đến dấu ]
@@ -88,6 +95,13 @@ public class TestCaseService {
 
             List<TestCase> testCases = mapper.readValue(cleanJsonContent, new TypeReference<List<TestCase>>() {});
 
+            // 3. TẠO VÀ LƯU LỊCH SỬ (SESSION)
+            ChatSession session = new ChatSession();
+            String title = userStory.length() > 35 ? userStory.substring(0, 35) + "..." : userStory;
+            session.setTitle(title);
+            session.setUser(currentUser);
+            ChatSession savedSession = chatSessionRepository.save(session);
+
             // 4. GẮN TEST CASE VÀO LỊCH SỬ VỪA TẠO
             for (TestCase tc : testCases) {
                 tc.setChatSession(savedSession);
@@ -96,9 +110,12 @@ public class TestCaseService {
             return testCaseRepository.saveAll(testCases);
 
         } catch (WebClientResponseException e) {
-            throw new RuntimeException("Groq từ chối: " + e.getResponseBodyAsString());
+            log.error("Groq từ chối (status {}): {}", e.getStatusCode().value(), e.getResponseBodyAsString(), e);
+            throw new RuntimeException("Groq từ chối (" + e.getStatusCode().value() + "): "
+                    + e.getResponseBodyAsString(), e);
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi hệ thống: " + e.getMessage());
+            log.error("Lỗi khi sinh test case", e);
+            throw new RuntimeException("Lỗi hệ thống: " + e.getMessage(), e);
         }
     }
 
