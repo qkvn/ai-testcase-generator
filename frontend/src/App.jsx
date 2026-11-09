@@ -373,7 +373,8 @@ function App() {
       fetchSessions(); // tải lại lịch sử ngầm, không bắt người dùng chờ
       setActiveSessionId(null);
     } catch (err) {
-      setError(t.errConnect + (err.response?.data?.message || err.message));
+      const serverMsg = err.response?.data?.message;
+      setError(serverMsg ? '⚠️ ' + serverMsg : t.errConnect + err.message);
     } finally {
       setLoading(false);
     }

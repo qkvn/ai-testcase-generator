@@ -119,25 +119,75 @@ public class TestCaseService {
             log.error("Groq từ chối (status {}): {}", e.getStatusCode().value(), e.getResponseBodyAsString(), e);
             throw new RuntimeException("Groq từ chối (" + e.getStatusCode().value() + "): "
                     + e.getResponseBodyAsString(), e);
+        } catch (AiFormatException e) {
+            log.error("AI trả sai định dạng sau nhiều lần thử", e);
+            throw e;
         } catch (Exception e) {
             log.error("Lỗi khi sinh test case", e);
             throw new RuntimeException("Lỗi hệ thống: " + e.getMessage(), e);
         }
     }
 
-    /** Gọi Groq, lấy nội dung trả lời và bóc tách phần JSON (object hoặc mảng). */
-    private JsonNode callGroqForJson(String systemPrompt, String userContent) throws Exception {
-        Map<String, Object> requestBody = Map.of(
-                "model", model,
-                "messages", List.of(
-                        Map.of("role", "system", "content", systemPrompt),
-                        Map.of("role", "user", "content", userContent)
-                ),
-                "temperature", 0.2,
-                "max_tokens", 8000 // Đủ chỗ cho cả yêu cầu + test case (kể cả model có bước suy luận)
-        );
+    // Luôn nhắc AI: không hỏi lại, tự suy luận khi User Story quá ngắn, chỉ trả JSON
+    private static final String NO_QUESTION_RULE =
+            " QUY TAC BAT BUOC: Neu User Story qua ngan hoac mo ho (VD chi vai tu nhu 'dang xuat'), "
+            + "hay tu suy luan cac yeu cau pho bien, hop ly cho chuc nang do. "
+            + "TUYET DOI khong hoi lai nguoi dung, khong giai thich, khong viet van ban ngoai JSON.";
 
-        String rawResponse = webClient.post()
+    /**
+     * Gọi Groq và trả về JSON đã parse.
+     * - Bật JSON mode để AI bắt buộc trả JSON hợp lệ.
+     * - Nếu AI vẫn trả văn bản thường / JSON hỏng -> tự thử lại 1 lần với lời nhắc mạnh hơn.
+     * - Nếu model không hỗ trợ JSON mode -> thử lại không dùng JSON mode.
+     */
+    private JsonNode callGroqForJson(String systemPrompt, String userContent) throws Exception {
+        boolean useJsonMode = true;
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            String prompt = systemPrompt + NO_QUESTION_RULE
+                    + (attempt > 1 ? " Lan truoc ban da tra ve sai dinh dang. CHI TRA VE DUY NHAT MOT OBJECT JSON HOP LE." : "");
+            try {
+                return parseAiJson(requestGroq(prompt, userContent, useJsonMode));
+            } catch (WebClientResponseException e) {
+                String body = e.getResponseBodyAsString();
+                if (e.getStatusCode().value() == 400 && body.contains("json_validate_failed")) {
+                    // JSON mode bật nhưng AI sinh JSON hỏng -> thử lại
+                    log.warn("Groq json_validate_failed (lần {}), thử lại", attempt);
+                    lastError = e;
+                } else if (e.getStatusCode().value() == 400 && useJsonMode && body.contains("response_format")) {
+                    // Model không hỗ trợ JSON mode -> tắt đi và thử lại
+                    log.warn("Model không hỗ trợ JSON mode, chuyển sang chế độ thường");
+                    useJsonMode = false;
+                    lastError = e;
+                } else {
+                    throw e;
+                }
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                log.warn("AI trả về không phải JSON (lần {}): {}", attempt, e.getOriginalMessage());
+                lastError = e;
+            }
+        }
+        throw new AiFormatException("AI trả về dữ liệu không đúng định dạng. Vui lòng bấm sinh lại "
+                + "hoặc mô tả User Story chi tiết hơn.", lastError);
+    }
+
+    /** Lỗi do AI trả sai định dạng (để hiện thông báo dễ hiểu cho người dùng). */
+    public static class AiFormatException extends RuntimeException {
+        public AiFormatException(String message, Throwable cause) { super(message, cause); }
+    }
+
+    private String requestGroq(String systemPrompt, String userContent, boolean jsonMode) throws Exception {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", model);
+        requestBody.put("messages", List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userContent)
+        ));
+        requestBody.put("temperature", 0.2);
+        requestBody.put("max_tokens", 8000); // Đủ chỗ cho cả yêu cầu + test case (kể cả model có bước suy luận)
+        if (jsonMode) requestBody.put("response_format", Map.of("type", "json_object"));
+
+        return webClient.post()
                 .uri("https://api.groq.com/openai/v1/chat/completions")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY)
@@ -151,7 +201,10 @@ public class TestCaseService {
                         // Hết lượt thử thì ném lại lỗi gốc, không ném "Retries exhausted" nữa
                         .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
                 .block();
+    }
 
+    /** Lấy nội dung trả lời của AI và bóc tách phần JSON (object hoặc mảng). */
+    private JsonNode parseAiJson(String rawResponse) throws Exception {
         JsonNode rootNode = mapper.readTree(rawResponse);
         String content = rootNode.path("choices").get(0).path("message").path("content").asText();
 

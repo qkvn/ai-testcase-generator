@@ -146,6 +146,19 @@ public class TestCaseController {
         return ResponseEntity.ok().build();
     }
 
+    /** Trả lỗi dạng {"message": "..."} để giao diện hiển thị thông báo dễ hiểu thay vì "status code 500". */
+    @ExceptionHandler(TestCaseService.AiFormatException.class)
+    public ResponseEntity<?> handleAiFormat(TestCaseService.AiFormatException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(java.util.Map.of("message", e.getMessage()));
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<?> handleRuntime(RuntimeException e) {
+        String msg = e.getMessage() == null ? "Lỗi hệ thống, vui lòng thử lại." : e.getMessage();
+        if (msg.length() > 300) msg = msg.substring(0, 300) + "...";
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(java.util.Map.of("message", msg));
+    }
+
     /** Trả về lỗi nếu người dùng hiện tại không phải chủ phiên; null nếu hợp lệ. */
     private ResponseEntity<?> checkOwner(Long sessionId, OAuth2User principal) {
         if (principal == null) {
