@@ -788,8 +788,8 @@ function App() {
     <div className="app-root">
       <style>{appCss}</style>
 
-      {activeMenuId && <div onClick={() => setActiveMenuId(null)} className="app-backdrop" style={{ zIndex: 29 }}></div>}
-      {showSettingsMenu && <div onClick={() => setShowSettingsMenu(false)} className="app-backdrop" style={{ zIndex: 30 }}></div>}
+      {activeMenuId && <div onClick={() => setActiveMenuId(null)} className="app-backdrop" style={{ zIndex: 25 }}></div>}
+      {showSettingsMenu && <div onClick={() => setShowSettingsMenu(false)} className="app-backdrop" style={{ zIndex: 25 }}></div>}
       {showPlusMenu && <div onClick={() => setShowPlusMenu(false)} className="app-backdrop" style={{ zIndex: 8 }}></div>}
 
       {/* ================= SHARE MODAL ================= */}
@@ -817,7 +817,9 @@ function App() {
       {!isSharedView && (
         <>
           {isSidebarOpen && <div className="app-sidebar-scrim" onClick={() => setIsSidebarOpen(false)} />}
-          <aside className={'app-sidebar' + (isSidebarOpen ? '' : ' collapsed')}>
+          {/* Sidebar nằm trên lớp phủ đóng menu; bấm chỗ trống trong sidebar cũng đóng menu */}
+          <aside className={'app-sidebar' + (isSidebarOpen ? '' : ' collapsed')}
+            onClick={() => { if (activeMenuId) setActiveMenuId(null); if (showSettingsMenu) setShowSettingsMenu(false); }}>
             <div className="app-sidebar-inner">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '19px', whiteSpace: 'nowrap' }}>
@@ -850,7 +852,7 @@ function App() {
                           <span style={{ marginRight: '6px' }}>{pinned ? '📌' : '💬'}</span>{item.title}
                         </div>
                       )}
-                      <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === item.id ? null : item.id); }} className="app-history-more">⋮</button>
+                      <button onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(false); setActiveMenuId(activeMenuId === item.id ? null : item.id); }} className="app-history-more">⋮</button>
 
                       {activeMenuId === item.id && (
                         <div className="app-menu" style={{ top: '38px', right: '6px' }}>
@@ -880,10 +882,10 @@ function App() {
                 <div style={{ fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.name}</div>
                 <div className="app-user-email" style={{ fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.email}</div>
               </div>
-              <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className="app-icon-btn app-icon-btn-light" title="Cài đặt">⚙️</button>
+              <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); setShowSettingsMenu(!showSettingsMenu); }} className="app-icon-btn app-icon-btn-light" title="Cài đặt">⚙️</button>
               {showSettingsMenu && (
                 <div className="app-menu" style={{ bottom: '64px', right: '12px', zIndex: 31 }}>
-                  <div onClick={handleLogout} className="app-menu-item" style={{ color: '#dc3545', fontWeight: 600 }}>🚪 {t.logout}</div>
+                  <div onClick={(e) => { e.stopPropagation(); handleLogout(); }} className="app-menu-item" style={{ color: '#dc3545', fontWeight: 600 }}>🚪 {t.logout}</div>
                 </div>
               )}
             </div>
@@ -1046,7 +1048,7 @@ const appCss = `
 .app-grad { background: linear-gradient(120deg, #1f4fd8, #7b4fe0); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 /* ----- Sidebar ----- */
-.app-sidebar { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; background: #fff; border-right: 1px solid var(--line); transition: width .25s ease; overflow: hidden; position: relative; z-index: 20; }
+.app-sidebar { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; background: #fff; border-right: 1px solid var(--line); transition: width .25s ease; overflow: hidden; position: relative; z-index: 26; }
 .app-sidebar.collapsed { width: 0; border-right: none; }
 .app-sidebar-inner { padding: 18px 14px 0; min-width: 272px; box-sizing: border-box; display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 .app-side-search { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 14px 0 20px; transition: border-color .15s, box-shadow .15s; }
