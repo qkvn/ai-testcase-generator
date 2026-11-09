@@ -418,6 +418,22 @@ public class TestCaseService {
         chatSessionRepository.save(session);
     }
 
+    /** Lưu nhiều test case trong 1 request (thay vì gọi PUT từng cái). */
+    public List<TestCase> updateTestCases(List<TestCase> updates) {
+        Map<Long, TestCase> byId = new HashMap<>();
+        for (TestCase u : updates) if (u.getDbId() != null) byId.put(u.getDbId(), u);
+        List<TestCase> existing = testCaseRepository.findAllById(byId.keySet());
+        for (TestCase tc : existing) {
+            TestCase u = byId.get(tc.getDbId());
+            tc.setSummary(u.getSummary());
+            tc.setPrecondition(u.getPrecondition());
+            tc.setSteps(u.getSteps());
+            tc.setExpected_result(u.getExpected_result());
+            tc.setRequirementIds(u.getRequirementIds());
+        }
+        return testCaseRepository.saveAll(existing);
+    }
+
     public TestCase updateTestCase(Long id, TestCase updatedData) {
         TestCase existing = testCaseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy Test Case"));

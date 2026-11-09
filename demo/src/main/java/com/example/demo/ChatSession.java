@@ -3,7 +3,7 @@ package com.example.demo;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
@@ -23,7 +23,7 @@ public class ChatSession {
 
     // Một ChatSession chứa nhiều TestCase
     @OneToMany(mappedBy = "chatSession", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference
+    @JsonIgnore // Không trả kèm test case trong danh sách phiên (tránh N+1 query làm chậm sidebar)
     private List<TestCase> testCases;
 
     // Nội dung User Story gốc (dùng cho phân tích truy vết yêu cầu)

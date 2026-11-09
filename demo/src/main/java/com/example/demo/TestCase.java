@@ -1,7 +1,6 @@
 package com.example.demo;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
@@ -69,6 +68,6 @@ public class TestCase {
     // Liên kết khóa ngoại (Foreign Key) ngược lại bảng ChatSession
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id")
-    @JsonBackReference
+    @JsonIgnore
     private ChatSession chatSession;
 }

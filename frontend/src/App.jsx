@@ -1,9 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import TraceabilityPanel from './TraceabilityPanel';
 import LandingPage from './LandingPage';
 import { computeCoverage, parseRequirementIds } from './traceability';
@@ -12,6 +8,18 @@ axios.defaults.withCredentials = true;
 
 // Xác định môi trường: Trống nếu chạy trên Render, dùng localhost nếu chạy dưới máy.
 const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8080' : '';
+
+// Thư viện xuất Excel/PDF khá nặng -> chỉ tải khi người dùng bấm xuất file
+const loadExcelLibs = async () => {
+  const [excelMod, saverMod] = await Promise.all([import('exceljs'), import('file-saver')]);
+  const ExcelJS = excelMod.default || excelMod;
+  const saveAs = saverMod.saveAs || saverMod.default?.saveAs || saverMod.default;
+  return { ExcelJS, saveAs };
+};
+const loadPdfLibs = async () => {
+  const [pdfMod, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+  return { jsPDF: pdfMod.jsPDF || pdfMod.default, autoTable: autoTableMod.default || autoTableMod.autoTable };
+};
 
 const translations = {
   vi: {
@@ -170,6 +178,10 @@ function App() {
   const [activeTab, setActiveTab] = useState('testcases');
   const [traceBusy, setTraceBusy] = useState(false);
 
+  // Cache dữ liệu từng phiên: mở lại phiên cũ hiển thị ngay, dữ liệu mới được tải ngầm
+  const sessionCache = useRef(new Map());
+  const latestRequestedSession = useRef(null);
+
   const t = translations[language];
 
   useEffect(() => {
@@ -244,24 +256,46 @@ function App() {
   };
 
   const fetchTestCasesOnly = async (sessionId) => {
+    latestRequestedSession.current = sessionId;
     setActiveSessionId(sessionId);
     setCurrentSessionId(sessionId);
-    setLoading(true);
     setError('');
     setHasUnsavedChanges(false);
+
+    const cached = sessionCache.current.get(sessionId);
+    if (cached) {
+      setTestCases(cached.testCases);
+      setRequirements(cached.requirements);
+    } else {
+      setTestCases([]);
+      setRequirements([]);
+      setLoading(true);
+    }
+
     try {
       const [tcRes, reqRes] = await Promise.all([
         axios.get(API_BASE_URL + '/api/sessions/' + sessionId + '/testcases'),
         axios.get(API_BASE_URL + '/api/sessions/' + sessionId + '/requirements').catch(() => ({ data: [] }))
       ]);
-      setTestCases(tcRes.data);
-      setRequirements(reqRes.data || []);
+      const fresh = { testCases: tcRes.data, requirements: reqRes.data || [] };
+      sessionCache.current.set(sessionId, fresh);
+      // Người dùng đã chuyển sang phiên khác trong lúc chờ -> bỏ kết quả cũ
+      if (latestRequestedSession.current !== sessionId) return;
+      setTestCases(fresh.testCases);
+      setRequirements(fresh.requirements);
     } catch (err) {
-      setError("Lỗi tải test case: " + (err.response?.data?.message || err.message));
+      if (latestRequestedSession.current === sessionId && !cached) {
+        setError("Lỗi tải test case: " + (err.response?.data?.message || err.message));
+      }
     } finally {
-      setLoading(false);
+      if (latestRequestedSession.current === sessionId) setLoading(false);
     }
   };
+
+  // Luôn đồng bộ cache với dữ liệu đang hiển thị của phiên hiện tại
+  useEffect(() => {
+    if (currentSessionId) sessionCache.current.set(currentSessionId, { testCases, requirements });
+  }, [currentSessionId, testCases, requirements]);
 
   const handleSelectSession = (sessionId) => {
     fetchTestCasesOnly(sessionId);
@@ -285,9 +319,10 @@ function App() {
       setTestCases(res.data.testCases || []);
       setRequirements(res.data.requirements || []);
       setCurrentSessionId(res.data.sessionId || null);
+      latestRequestedSession.current = res.data.sessionId || null;
       setUserStory('');
       setHasUnsavedChanges(false);
-      await fetchSessions();
+      fetchSessions(); // tải lại lịch sử ngầm, không bắt người dùng chờ
       setActiveSessionId(null);
     } catch (err) {
       setError(t.errConnect + (err.response?.data?.message || err.message));
@@ -302,35 +337,46 @@ function App() {
     setActiveMenuId(null);
   };
 
+  const isPinned = (s) => s.pinned === true || s.isPinned === true;
+  const sortSessions = (list) => [...list].sort((a, b) => (isPinned(b) - isPinned(a)) || (b.id - a.id));
+
   const handleSaveRename = async (sessionId) => {
-    if (!editTitle.trim()) { setEditingSessionId(null); return; }
+    const newTitle = editTitle.trim();
+    setEditingSessionId(null);
+    const old = chatSessions.find(s => s.id === sessionId);
+    if (!newTitle || !old || old.title === newTitle) return;
+    setChatSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: newTitle } : s));
     try {
-      await axios.put(API_BASE_URL + '/api/sessions/' + sessionId + '/rename', editTitle, { headers: { 'Content-Type': 'text/plain' } });
-      await fetchSessions();
-      setEditingSessionId(null);
+      await axios.put(API_BASE_URL + '/api/sessions/' + sessionId + '/rename', newTitle, { headers: { 'Content-Type': 'text/plain' } });
     } catch (err) {
+      setChatSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: old.title } : s));
       alert("Lỗi khi đổi tên: " + (err.response?.data?.message || err.message));
     }
   };
 
   const handleDeleteSession = async (sessionId) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa lịch sử này không?")) return;
+    setActiveMenuId(null);
+    const before = chatSessions;
+    setChatSessions(prev => prev.filter(s => s.id !== sessionId));
+    sessionCache.current.delete(sessionId);
+    if (activeSessionId === sessionId || currentSessionId === sessionId) handleNewChat();
     try {
       await axios.delete(API_BASE_URL + '/api/sessions/' + sessionId);
-      await fetchSessions();
-      if (activeSessionId === sessionId) handleNewChat();
-      setActiveMenuId(null);
     } catch (err) {
+      setChatSessions(before);
       alert("Lỗi khi xóa: " + (err.response?.data?.message || err.message));
     }
   };
 
   const handleTogglePin = async (session) => {
+    setActiveMenuId(null);
+    const toggle = (list) => sortSessions(list.map(s => s.id === session.id ? { ...s, pinned: !isPinned(s), isPinned: !isPinned(s) } : s));
+    setChatSessions(prev => toggle(prev));
     try {
       await axios.put(API_BASE_URL + '/api/sessions/' + session.id + '/pin');
-      await fetchSessions();
-      setActiveMenuId(null);
     } catch (err) {
+      setChatSessions(prev => toggle(prev));
       alert("Lỗi khi ghim: " + (err.response?.data?.message || err.message));
     }
   };
@@ -363,10 +409,7 @@ function App() {
   const handleSaveChangesDB = async () => {
       setLoading(true);
       try {
-        await Promise.all(testCases.map(tc => {
-          const targetId = tc.dbId ? tc.dbId : tc.id;
-          return axios.put(API_BASE_URL + '/api/testcases/' + targetId, tc);
-        }));
+        await axios.put(API_BASE_URL + '/api/testcases', testCases);
         setHasUnsavedChanges(false);
         alert(t.saveSuccess);
       } catch (err) {
@@ -504,6 +547,7 @@ function App() {
 
   const generateFormattedExcel = async (dataToExport, fileNameSuffix, reqs = []) => {
     if (!dataToExport || dataToExport.length === 0) { alert("Không có dữ liệu!"); return; }
+    const { ExcelJS, saveAs } = await loadExcelLibs();
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Test Cases');
     worksheet.columns = [
@@ -603,6 +647,7 @@ function App() {
       const res = await axios.get(API_BASE_URL + '/api/sessions/' + session.id + '/testcases');
       const data = res.data;
       if (!data || data.length === 0) { alert("Không có dữ liệu để xuất PDF!"); return; }
+      const { jsPDF, autoTable } = await loadPdfLibs();
       const doc = new jsPDF({ orientation: "landscape" });
 
       const loadFont = async (url, filename, fontName, fontStyle) => {

@@ -86,6 +86,11 @@ public class TestCaseController {
     public void togglePinSession(@PathVariable Long id) {
         testCaseService.togglePinSession(id);
     }
+    @PutMapping("/testcases")
+    public ResponseEntity<?> updateTestCases(@RequestBody List<TestCase> updates) {
+        return ResponseEntity.ok(testCaseService.updateTestCases(updates));
+    }
+
     @PutMapping("/testcases/{id}")
     public ResponseEntity<?> updateTestCase(@PathVariable Long id, @RequestBody TestCase updatedTc) {
         return ResponseEntity.ok(testCaseService.updateTestCase(id, updatedTc));
