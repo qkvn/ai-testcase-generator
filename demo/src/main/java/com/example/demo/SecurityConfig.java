@@ -6,6 +6,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.http.HttpStatus;
+import jakarta.servlet.DispatcherType;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -24,9 +27,19 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable()) // Tắt CSRF để React gọi API dễ dàng
                 .authorizeHttpRequests(auth -> auth
+                        // Cho phép các lượt forward nội bộ ("/" -> "/index.html") và trang lỗi
+                        .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
                         // BẮT BUỘC: Mở khóa các endpoint hệ thống và OAuth2
                         .requestMatchers("/", "/error", "/login**", "/oauth2/**", "/api/user/me").permitAll()
+                        // Mở file tĩnh của React để người chưa đăng nhập vẫn xem được trang chủ (landing page)
+                        .requestMatchers("/index.html", "/assets/**", "/favicon.ico", "/*.svg", "/*.png", "/*.ico", "/*.ttf", "/*.json", "/*.txt").permitAll()
                         .anyRequest().authenticated()
+                )
+                // Gọi API khi chưa đăng nhập -> trả 401 cho frontend xử lý, KHÔNG tự chuyển sang trang Google
+                .exceptionHandling(ex -> ex
+                        .defaultAuthenticationEntryPointFor(
+                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                                request -> request.getRequestURI().startsWith("/api/"))
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
