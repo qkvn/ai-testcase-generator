@@ -25,18 +25,18 @@ export default function TraceabilityPanel({
 
   const actionBar = !readOnly && (
     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-      <button onClick={onAnalyze} disabled={busy} style={btn(busy ? '#6c757d' : '#7b4fe0')}>
+      <button onClick={onAnalyze} disabled={busy} style={btn(busy ? '#94a3b8' : '#1f4fd8')}>
         {busy ? t.traceAnalyzing : '🤖 ' + t.traceAnalyze}
       </button>
       {requirements.length > 0 && (
-        <button onClick={() => setShowAdd(v => !v)} disabled={busy} style={btn('#1f4fd8')}>+ {t.traceAddReq}</button>
+        <button onClick={() => setShowAdd(v => !v)} disabled={busy} style={{ ...btn('#fff'), color: '#0f172a', border: '1px solid #e8ecf2', boxShadow: 'none' }}>+ {t.traceAddReq}</button>
       )}
     </div>
   );
 
   if (requirements.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px 24px', backgroundColor: '#f8faff', borderRadius: '14px', border: '2px dashed #dbe4ff', color: '#6c757d' }}>
+      <div style={{ textAlign: 'center', padding: '40px 24px', backgroundColor: '#fff', borderRadius: '14px', border: '1px dashed #d8dfea', color: '#6c757d' }}>
         <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔗</div>
         <p style={{ margin: '0 0 16px 0' }}>{testCases.length === 0 ? t.emptyList : t.traceEmpty}</p>
         {testCases.length > 0 && <div style={{ display: 'flex', justifyContent: 'center' }}>{actionBar}</div>}
@@ -96,10 +96,10 @@ export default function TraceabilityPanel({
         </div>
       )}
 
-      <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e6ebf3' }}>
+      <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e8ecf2' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
           <thead>
-            <tr style={{ backgroundColor: '#eef3ff', color: '#1f4fd8', borderBottom: '1px solid #dbe4ff' }}>
+            <tr style={{ backgroundColor: '#fafbfd', color: '#64748b', borderBottom: '1px solid #e8ecf2', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '.5px' }}>
               <th style={th}>{t.traceColCode}</th>
               <th style={th}>{t.traceColDesc}</th>
               <th style={th}>{t.traceColPriority}</th>
@@ -156,11 +156,11 @@ export default function TraceabilityPanel({
       {/* ---------- Ma trận truy vết ---------- */}
       <h3 style={{ margin: '28px 0 4px', fontSize: '17px' }}>{t.traceMatrix}</h3>
       {!readOnly && <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#6c757d' }}>{t.traceMatrixHint}</p>}
-      <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e6ebf3', marginBottom: '24px' }}>
+      <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e8ecf2', marginBottom: '24px' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: '13px', minWidth: '100%' }}>
           <thead>
-            <tr style={{ backgroundColor: '#eef3ff', color: '#1f4fd8' }}>
-              <th style={{ ...mth, position: 'sticky', left: 0, backgroundColor: '#eef3ff', zIndex: 1, textAlign: 'left', minWidth: '90px' }}>{t.traceColCode} \ TC</th>
+            <tr style={{ backgroundColor: '#fafbfd', color: '#64748b' }}>
+              <th style={{ ...mth, position: 'sticky', left: 0, backgroundColor: '#fafbfd', zIndex: 1, textAlign: 'left', minWidth: '90px' }}>{t.traceColCode} \ TC</th>
               {testCases.map((tc, i) => <th key={tc.dbId || i} title={tc.summary} style={mth}>{tc.id}</th>)}
               <th style={{ ...mth, backgroundColor: '#e9ecef' }}>Σ</th>
             </tr>
@@ -186,7 +186,7 @@ export default function TraceabilityPanel({
                 </tr>
               );
             })}
-            <tr style={{ backgroundColor: '#eef3ff', color: '#1f4fd8' }}>
+            <tr style={{ backgroundColor: '#fafbfd', color: '#64748b' }}>
               <td style={{ ...mtd, position: 'sticky', left: 0, backgroundColor: '#e9ecef', fontWeight: 600, textAlign: 'left', zIndex: 1 }}>Σ</td>
               {testCases.map((tc, i) => {
                 const n = (tc.requirementIds || []).filter(c => cov.byReq[c]).length;
@@ -201,8 +201,8 @@ export default function TraceabilityPanel({
   );
 }
 
-const btn = (bg) => ({ padding: '8px 14px', backgroundColor: bg, color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 600, boxShadow: '0 4px 12px rgba(31,79,216,0.18)', fontSize: '14px', cursor: 'pointer' });
-const card = { padding: '16px', borderRadius: '14px', border: '1px solid #e6ebf3', backgroundColor: '#f8faff' };
+const btn = (bg) => ({ padding: '8px 14px', backgroundColor: bg, color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 600, boxShadow: 'none', fontSize: '14px', cursor: 'pointer' });
+const card = { padding: '16px', borderRadius: '14px', border: '1px solid #e8ecf2', backgroundColor: '#fff' };
 const cardLabel = { fontSize: '12px', color: '#6c757d', textTransform: 'uppercase', fontWeight: 600, marginBottom: '6px' };
 const alertBox = { padding: '10px 14px', borderRadius: '8px', border: '1px solid', fontSize: '14px', marginBottom: '8px' };
 const th = { padding: '10px 12px', whiteSpace: 'nowrap' };

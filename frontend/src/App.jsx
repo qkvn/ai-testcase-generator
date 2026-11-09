@@ -768,8 +768,8 @@ function App() {
       <div className="app-loading-screen">
         <style>{appCss}</style>
         <div className="app-spinner" />
-        <div style={{ marginTop: '16px', fontWeight: 600 }}>🧪 AI TestGen</div>
-        <div style={{ fontSize: '14px', opacity: 0.85, marginTop: '4px' }}>{t.checkingAuth}</div>
+        <div style={{ marginTop: '16px', fontWeight: 700 }}>🧪 AI TestGen</div>
+        <div style={{ fontSize: '14px', color: '#64748b', marginTop: '4px' }}>{t.checkingAuth}</div>
       </div>
     );
   }
@@ -796,7 +796,7 @@ function App() {
       {shareModalSession && (
         <div className="app-overlay" onClick={() => setShareModalSession(null)}>
           <div className="app-modal" onClick={(e) => e.stopPropagation()}>
-            <div style={{ height: '6px', background: 'linear-gradient(90deg, #1f4fd8, #7b4fe0)' }} />
+            <div style={{ height: '3px', background: 'linear-gradient(90deg, #1f4fd8, #7b4fe0)' }} />
             <div style={{ padding: '22px 24px' }}>
               <button onClick={() => setShareModalSession(null)} className="app-modal-close" aria-label="close">✕</button>
               <h3 style={{ margin: '0 0 6px 0', fontSize: '19px' }}>🔗 {t.shareTitle}</h3>
@@ -826,7 +826,7 @@ function App() {
                 <button onClick={() => setIsSidebarOpen(false)} className="app-icon-btn app-icon-btn-light" title="Thu gọn">«</button>
               </div>
 
-              <button onClick={handleNewChat} className="app-btn app-btn-orange" style={{ width: '100%', justifyContent: 'center', padding: '11px' }}>
+              <button onClick={handleNewChat} className="app-btn app-btn-new">
                 <span style={{ fontSize: '18px', lineHeight: 1 }}>+</span> {t.newChat}
               </button>
 
@@ -872,13 +872,13 @@ function App() {
 
             <div className="app-user">
               {currentUser.picture ? (
-                <img src={currentUser.picture} alt="Avatar" referrerPolicy="no-referrer" style={{ width: '38px', height: '38px', borderRadius: '50%', marginRight: '10px', border: '2px solid rgba(255,255,255,0.6)' }} />
+                <img src={currentUser.picture} alt="Avatar" referrerPolicy="no-referrer" style={{ width: '38px', height: '38px', borderRadius: '50%', marginRight: '10px', border: '1px solid #e8ecf2' }} />
               ) : (
                 <div style={{ width: '38px', height: '38px', borderRadius: '50%', marginRight: '10px', background: '#ff8a00', color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{(firstName || currentUser.email || '?').charAt(0).toUpperCase()}</div>
               )}
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <div style={{ fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.name}</div>
-                <div style={{ fontSize: '12px', opacity: 0.75, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.email}</div>
+                <div className="app-user-email" style={{ fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.email}</div>
               </div>
               <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className="app-icon-btn app-icon-btn-light" title="Cài đặt">⚙️</button>
               {showSettingsMenu && (
@@ -911,8 +911,8 @@ function App() {
           {/* ---------- Ô nhập User Story (banner giống trang chủ) ---------- */}
           {showComposer && (
             <section className="app-hero">
-              <h1 className="app-hero-title">{t.heroHello}{firstName ? ', ' + firstName : ''} 👋</h1>
-              <p style={{ margin: '0 0 18px 0', opacity: 0.95, fontSize: '15px' }}>{t.heroSub}</p>
+              <h1 className="app-hero-title">{t.heroHello}{firstName ? ', ' : ''}<span className="app-grad">{firstName}</span> 👋</h1>
+              <p style={{ margin: '0 auto 24px', fontSize: '15px', lineHeight: 1.6, maxWidth: '600px' }}>{t.heroSub}</p>
               <div className="app-composer">
                 <textarea rows={3} placeholder={t.placeholder} value={userStory} onChange={(e) => setUserStory(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !loading) handleGenerate(); }} />
@@ -931,7 +931,7 @@ function App() {
                   </button>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '14px' }}>
+              <div className="app-chips" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '16px' }}>
                 {t.suggestions.map((s, i) => (
                   <button key={i} className="app-chip" onClick={() => setUserStory(s.text)}>{s.label}</button>
                 ))}
@@ -942,6 +942,7 @@ function App() {
           {!showComposer && error && <div className="app-error" style={{ marginBottom: '16px' }}>{error}</div>}
 
           {/* ---------- Danh sách ---------- */}
+          {!(showComposer && testCases.length === 0 && !loading) && (
           <section className="app-card">
             <div className="app-card-head">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -1026,6 +1027,7 @@ function App() {
               </div>
             )}
           </section>
+          )}
         </div>
       </main>
     </div>
@@ -1034,108 +1036,120 @@ function App() {
 
 // ================= STYLE (đồng bộ màu với trang chủ) =================
 const appCss = `
-.app-root { display: flex; height: 100vh; width: 100vw; overflow: hidden; font-family: system-ui, sans-serif; background: #f4f7fb; color: #212529; }
+:root { --brand: #1f4fd8; --brand-soft: #eef3ff; --accent: #ff8a00; --ink: #0f172a; --muted: #64748b; --line: #e8ecf2; --bg: #f7f9fc; }
+.app-root { display: flex; height: 100vh; width: 100vw; overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink); }
 .app-backdrop { position: fixed; inset: 0; }
-.app-loading-screen { height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: system-ui, sans-serif; color: #fff; background: linear-gradient(120deg, #1f4fd8 0%, #3b6ff5 45%, #7b4fe0 100%); }
-.app-spinner { width: 38px; height: 38px; border-radius: 50%; border: 4px solid rgba(255,255,255,0.35); border-top-color: #fff; animation: app-spin .8s linear infinite; display: inline-block; box-sizing: border-box; }
-.app-spinner-sm { width: 16px; height: 16px; border-width: 2px; vertical-align: -3px; }
+.app-loading-screen { height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+.app-spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #dbe4ff; border-top-color: var(--brand); animation: app-spin .8s linear infinite; display: inline-block; box-sizing: border-box; }
+.app-spinner-sm { width: 15px; height: 15px; border-width: 2px; border-color: rgba(255,255,255,0.45); border-top-color: #fff; vertical-align: -3px; }
 @keyframes app-spin { to { transform: rotate(360deg); } }
+.app-grad { background: linear-gradient(120deg, #1f4fd8, #7b4fe0); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 /* ----- Sidebar ----- */
-.app-sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; color: #fff; background: linear-gradient(180deg, #1a3fb8 0%, #1f4fd8 55%, #3b4fd8 100%); transition: width .25s ease, margin .25s ease; overflow: hidden; position: relative; z-index: 20; }
-.app-sidebar.collapsed { width: 0; }
-.app-sidebar-inner { padding: 18px 16px 0; min-width: 280px; box-sizing: border-box; display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-.app-side-search { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.16); border-radius: 10px; padding: 9px 12px; margin: 16px 0 18px; }
-.app-side-search input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: #fff; font-size: 14px; }
-.app-side-search input::placeholder { color: rgba(255,255,255,0.75); }
-.app-side-label { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; opacity: .7; margin: 0 0 8px 6px; }
-.app-history { flex: 1; overflow-y: auto; margin: 0 -6px 12px; padding: 0 6px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.3) transparent; }
-.app-history-item { position: relative; display: flex; align-items: center; padding: 9px 6px 9px 10px; border-radius: 10px; margin-bottom: 3px; transition: background .15s; border-left: 3px solid transparent; }
-.app-history-item:hover { background: rgba(255,255,255,0.10); }
-.app-history-item.active { background: rgba(255,255,255,0.20); border-left-color: #ff8a00; }
-.app-history-title { flex: 1; cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.app-history-more { background: none; border: none; color: #fff; opacity: .6; cursor: pointer; font-size: 16px; padding: 0 6px; border-radius: 6px; }
-.app-history-item:hover .app-history-more, .app-history-item.active .app-history-more { opacity: 1; }
-.app-rename-input { flex: 1; padding: 5px 8px; border-radius: 6px; border: 2px solid #ff8a00; outline: none; font-size: 14px; min-width: 0; }
-.app-user { padding: 12px 14px; display: flex; align-items: center; background: rgba(0,0,0,0.15); min-width: 280px; box-sizing: border-box; position: relative; }
+.app-sidebar { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; background: #fff; border-right: 1px solid var(--line); transition: width .25s ease; overflow: hidden; position: relative; z-index: 20; }
+.app-sidebar.collapsed { width: 0; border-right: none; }
+.app-sidebar-inner { padding: 18px 14px 0; min-width: 272px; box-sizing: border-box; display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.app-side-search { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 14px 0 20px; transition: border-color .15s, box-shadow .15s; }
+.app-side-search:focus-within { border-color: #b9c8f5; box-shadow: 0 0 0 3px rgba(31,79,216,0.08); }
+.app-side-search input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--ink); font-size: 14px; }
+.app-side-search input::placeholder { color: #94a3b8; }
+.app-side-label { font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: #94a3b8; margin: 0 0 6px 10px; }
+.app-history { flex: 1; overflow-y: auto; margin: 0 -4px 12px; padding: 0 4px; scrollbar-width: thin; scrollbar-color: #e2e8f0 transparent; }
+.app-history-item { position: relative; display: flex; align-items: center; padding: 8px 6px 8px 10px; border-radius: 8px; margin-bottom: 2px; transition: background .15s; color: #334155; }
+.app-history-item:hover { background: #f4f6fa; }
+.app-history-item.active { background: var(--brand-soft); color: var(--brand); }
+.app-history-title { flex: 1; cursor: pointer; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-history-item.active .app-history-title { font-weight: 600; }
+.app-history-more { background: none; border: none; color: inherit; opacity: 0; cursor: pointer; font-size: 16px; padding: 0 6px; border-radius: 6px; transition: opacity .15s; }
+.app-history-item:hover .app-history-more, .app-history-item.active .app-history-more { opacity: .7; }
+.app-rename-input { flex: 1; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--brand); outline: none; font-size: 14px; min-width: 0; box-shadow: 0 0 0 3px rgba(31,79,216,0.1); }
+.app-user { padding: 12px 14px; display: flex; align-items: center; border-top: 1px solid var(--line); min-width: 272px; box-sizing: border-box; position: relative; color: var(--ink); }
+.app-user-email { color: var(--muted); }
 .app-sidebar-scrim { display: none; }
 
 /* ----- Menu ----- */
-.app-menu { position: absolute; background: #fff; color: #212529; border-radius: 12px; box-shadow: 0 10px 30px rgba(15,23,42,0.18); z-index: 30; width: 220px; padding: 6px; border: 1px solid #eef0f3; }
-.app-menu-item { padding: 9px 12px; font-size: 14px; cursor: pointer; border-radius: 8px; transition: background .15s; }
-.app-menu-item:hover { background: #eef3ff; }
-.app-menu-sep { height: 1px; background: #eef0f3; margin: 4px 6px; }
+.app-menu { position: absolute; background: #fff; color: var(--ink); border-radius: 12px; box-shadow: 0 12px 32px rgba(15,23,42,0.12); z-index: 30; width: 210px; padding: 6px; border: 1px solid var(--line); }
+.app-menu-item { padding: 8px 10px; font-size: 14px; cursor: pointer; border-radius: 8px; transition: background .15s; }
+.app-menu-item:hover { background: #f4f6fa; }
+.app-menu-sep { height: 1px; background: var(--line); margin: 4px 6px; }
 
 /* ----- Buttons ----- */
-.app-btn { display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 10px; padding: 9px 16px; font-weight: 600; font-size: 14px; cursor: pointer; transition: transform .15s, background .15s, box-shadow .15s; white-space: nowrap; font-family: inherit; }
-.app-btn:hover:not(:disabled) { transform: translateY(-1px); }
-.app-btn:disabled { opacity: .7; cursor: not-allowed; }
-.app-btn-primary { background: #1f4fd8; color: #fff; box-shadow: 0 4px 12px rgba(31,79,216,0.25); }
+.app-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 10px; padding: 8px 14px; font-weight: 600; font-size: 14px; cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s, transform .15s; white-space: nowrap; font-family: inherit; }
+.app-btn:disabled { opacity: .65; cursor: not-allowed; }
+.app-btn-primary { background: var(--brand); color: #fff; }
 .app-btn-primary:hover:not(:disabled) { background: #1a43bb; }
-.app-btn-orange { background: #ff8a00; color: #fff; box-shadow: 0 4px 12px rgba(255,138,0,0.35); }
-.app-btn-orange:hover:not(:disabled) { background: #f07c00; }
-.app-btn-green { background: #198754; color: #fff; box-shadow: 0 4px 12px rgba(25,135,84,0.22); }
-.app-btn-green:hover { background: #157347; }
-.app-btn-soft { background: #eef3ff; color: #1f4fd8; }
-.app-btn-lg { border-radius: 24px; padding: 11px 24px; font-size: 15px; }
+.app-btn-orange { background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(255,138,0,0.28); }
+.app-btn-orange:hover:not(:disabled) { background: #f07c00; transform: translateY(-1px); }
+.app-btn-green { background: #fff; color: #15803d; border-color: #cfe9d9; }
+.app-btn-green:hover { background: #f0fbf4; }
+.app-btn-soft { background: var(--brand-soft); color: var(--brand); }
+.app-btn-new { width: 100%; justify-content: center; background: #fff; color: var(--ink); border-color: var(--line); padding: 10px; }
+.app-btn-new:hover { border-color: #c7d2e5; background: #f8fafc; }
+.app-btn-lg { border-radius: 24px; padding: 10px 22px; font-size: 15px; }
 .app-pulse { animation: app-pulse 1.8s ease-in-out infinite; }
-@keyframes app-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(31,79,216,0.45); } 50% { box-shadow: 0 0 0 6px rgba(31,79,216,0); } }
-.app-icon-btn { width: 36px; height: 36px; border-radius: 10px; border: none; background: #eef3ff; color: #1f4fd8; font-size: 18px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.app-icon-btn-light { background: rgba(255,255,255,0.16); color: #fff; }
-.app-icon-btn-light:hover { background: rgba(255,255,255,0.26); }
+@keyframes app-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(31,79,216,0.35); } 50% { box-shadow: 0 0 0 5px rgba(31,79,216,0); } }
+.app-icon-btn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: #fff; color: #475569; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
+.app-icon-btn:hover { background: #f4f6fa; }
+.app-icon-btn-light { border-color: transparent; background: transparent; }
 
 /* ----- Main ----- */
 .app-main { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow-y: auto; min-width: 0; }
-.app-topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e6ebf3; }
-.app-topbar-title { font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.app-lang { padding: 7px 10px; border-radius: 10px; border: 1px solid #dbe4ff; background: #eef3ff; color: #1f4fd8; font-weight: 600; cursor: pointer; }
-.app-content { max-width: 1100px; width: 100%; margin: 0 auto; padding: 24px 20px 40px; box-sizing: border-box; }
+.app-topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 28px; background: rgba(247,249,252,0.85); backdrop-filter: blur(10px); border-bottom: 1px solid transparent; }
+.app-topbar-title { font-size: 15px; font-weight: 600; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-lang { padding: 6px 10px; border-radius: 9px; border: 1px solid var(--line); background: #fff; color: #334155; font-weight: 500; cursor: pointer; font-size: 13px; }
+.app-content { max-width: 1080px; width: 100%; margin: 0 auto; padding: 20px 28px 48px; box-sizing: border-box; }
 
-.app-hero { background: linear-gradient(120deg, #1f4fd8 0%, #3b6ff5 45%, #7b4fe0 100%); color: #fff; border-radius: 20px; padding: 28px; margin-bottom: 24px; box-shadow: 0 12px 30px rgba(31,79,216,0.25); position: relative; overflow: visible; }
-.app-hero-title { margin: 0 0 6px 0; font-size: 26px; font-weight: 800; letter-spacing: -0.3px; }
-.app-composer { background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); }
-.app-composer textarea { width: 100%; border: none; outline: none; resize: none; font-size: 15px; font-family: inherit; color: #212529; box-sizing: border-box; }
-.app-composer-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; border-top: 1px solid #f1f3f5; padding-top: 10px; flex-wrap: wrap; }
-.app-plus { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #dbe4ff; background: #eef3ff; color: #1f4fd8; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.app-hint { font-size: 12px; color: #6c757d; background: #f1f3f5; padding: 3px 8px; border-radius: 6px; }
-.app-chip { background: rgba(255,255,255,0.18); color: #fff; border: 1px solid rgba(255,255,255,0.35); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; font-family: inherit; }
-.app-chip:hover { background: rgba(255,255,255,0.3); }
-.app-error { margin-top: 12px; background: #fff; color: #dc3545; padding: 10px 14px; border-radius: 10px; font-size: 14px; border: 1px solid #f5c2c7; }
+.app-hero { text-align: center; padding: 9vh 0 28px; margin: 0 auto 8px; max-width: 760px; }
+.app-hero-title { margin: 0 0 8px 0; font-size: 34px; font-weight: 800; letter-spacing: -0.8px; color: var(--ink); }
+.app-hero p { color: var(--muted) !important; opacity: 1 !important; }
+.app-composer { background: #fff; border-radius: 18px; padding: 14px 14px 12px; border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(15,23,42,0.06); text-align: left; transition: border-color .15s, box-shadow .15s; }
+.app-composer:focus-within { border-color: #b9c8f5; box-shadow: 0 10px 30px rgba(31,79,216,0.10); }
+.app-composer textarea { width: 100%; border: none; outline: none; resize: none; font-size: 15px; line-height: 1.55; font-family: inherit; color: var(--ink); box-sizing: border-box; background: transparent; }
+.app-composer textarea::placeholder { color: #94a3b8; }
+.app-composer-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 6px; padding-top: 8px; flex-wrap: wrap; }
+.app-plus { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: #475569; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.app-plus:hover { background: #f4f6fa; }
+.app-hint { font-size: 12px; color: #94a3b8; }
+.app-hero .app-chips { justify-content: center; }
+.app-chip { background: #fff; color: #475569; border: 1px solid var(--line); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 500; cursor: pointer; transition: border-color .15s, color .15s, background .15s; font-family: inherit; }
+.app-chip:hover { border-color: #b9c8f5; color: var(--brand); background: var(--brand-soft); }
+.app-error { margin-top: 12px; background: #fef2f2; color: #b91c1c; padding: 10px 14px; border-radius: 10px; font-size: 14px; border: 1px solid #fecaca; text-align: left; }
 
-.app-card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 18px rgba(15,23,42,0.06); border: 1px solid #eef0f3; }
+.app-card { background: #fff; border-radius: 16px; padding: 22px; border: 1px solid var(--line); }
 .app-card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-.app-count { background: #eef3ff; color: #1f4fd8; font-weight: 700; font-size: 13px; padding: 2px 10px; border-radius: 12px; }
-.app-tabs { display: inline-flex; gap: 4px; background: #f1f4fa; padding: 4px; border-radius: 12px; margin-bottom: 18px; flex-wrap: wrap; }
-.app-tab { padding: 8px 16px; border: none; background: none; border-radius: 9px; color: #495057; font-weight: 600; font-size: 14px; cursor: pointer; transition: background .15s, color .15s; font-family: inherit; }
-.app-tab:hover { color: #1f4fd8; }
-.app-tab.active { background: linear-gradient(120deg, #1f4fd8, #5b5fe6); color: #fff; box-shadow: 0 4px 12px rgba(31,79,216,0.25); }
-.app-tab-badge { margin-left: 8px; padding: 1px 8px; border-radius: 10px; font-size: 12px; color: #212529; }
-.app-empty { text-align: center; padding: 48px 20px; background: #f8faff; border-radius: 14px; border: 2px dashed #dbe4ff; color: #6c757d; }
+.app-card-head h2 { font-size: 17px !important; font-weight: 700; }
+.app-count { background: #f1f5f9; color: #475569; font-weight: 600; font-size: 12px; padding: 2px 9px; border-radius: 10px; }
+.app-tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin-bottom: 18px; flex-wrap: wrap; }
+.app-tab { padding: 10px 2px; border: none; background: none; color: var(--muted); font-weight: 600; font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s, border-color .15s; font-family: inherit; }
+.app-tab:hover { color: var(--ink); }
+.app-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+.app-tab-badge { margin-left: 8px; padding: 1px 7px; border-radius: 10px; font-size: 11px; color: var(--ink); }
+.app-empty { text-align: center; padding: 52px 20px; border-radius: 14px; border: 1px dashed #d8dfea; color: var(--muted); }
 
-.app-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid #e6ebf3; }
+.app-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--line); }
 .app-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
-.app-table thead th { background: #eef3ff; color: #1f4fd8; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; padding: 12px; font-weight: 700; border-bottom: 1px solid #dbe4ff; white-space: nowrap; }
-.app-table tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f3f5; vertical-align: top; }
+.app-table thead th { background: #fafbfd; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; padding: 11px 12px; font-weight: 700; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.app-table tbody td { padding: 10px; border-bottom: 1px solid #f1f4f8; vertical-align: top; color: #1e293b; }
 .app-table tbody tr { transition: background .15s; }
-.app-table tbody tr:hover { background: #f8faff; }
+.app-table tbody tr:hover { background: #fafbfd; }
 .app-table tbody tr:last-child td { border-bottom: none; }
-.app-tc-id { display: inline-block; background: #eef3ff; color: #1f4fd8; font-weight: 700; font-size: 12px; padding: 3px 9px; border-radius: 8px; margin-top: 4px; white-space: nowrap; }
+.app-tc-id { display: inline-block; color: var(--brand); font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--brand-soft); margin-top: 3px; white-space: nowrap; }
 
 /* ----- Modal ----- */
-.app-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.app-modal { position: relative; background: #fff; border-radius: 16px; width: 100%; max-width: 540px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
-.app-modal-close { position: absolute; top: 18px; right: 16px; background: none; border: none; font-size: 18px; color: #6c757d; cursor: pointer; }
-.app-share-box { display: flex; align-items: center; background: #f4f7fb; border: 1px solid #dbe4ff; border-radius: 12px; padding: 6px 6px 6px 14px; }
+.app-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.45); backdrop-filter: blur(2px); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.app-modal { position: relative; background: #fff; border-radius: 16px; width: 100%; max-width: 520px; overflow: hidden; box-shadow: 0 24px 60px rgba(15,23,42,0.25); }
+.app-modal-close { position: absolute; top: 16px; right: 14px; background: none; border: none; font-size: 16px; color: #94a3b8; cursor: pointer; }
+.app-share-box { display: flex; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 6px 6px 6px 14px; }
 
 /* ----- Mobile ----- */
 @media (max-width: 768px) {
-  .app-sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 40; box-shadow: 4px 0 24px rgba(0,0,0,0.25); }
-  .app-sidebar-scrim { display: block; position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 39; }
+  .app-sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 40; box-shadow: 8px 0 30px rgba(15,23,42,0.15); }
+  .app-sidebar-scrim { display: block; position: fixed; inset: 0; background: rgba(15,23,42,0.35); z-index: 39; }
   .app-topbar { padding: 10px 14px; }
-  .app-content { padding: 16px 12px 32px; }
-  .app-hero { padding: 20px 16px; border-radius: 16px; }
-  .app-hero-title { font-size: 21px; }
-  .app-card { padding: 14px; }
+  .app-content { padding: 8px 14px 32px; }
+  .app-hero { padding: 20px 0 18px; }
+  .app-hero-title { font-size: 26px; }
+  .app-card { padding: 16px; }
 }
 `;
 
