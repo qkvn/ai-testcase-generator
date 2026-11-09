@@ -5,6 +5,7 @@ import { saveAs } from 'file-saver';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import TraceabilityPanel from './TraceabilityPanel';
+import LandingPage from './LandingPage';
 import { computeCoverage, parseRequirementIds } from './traceability';
 
 axios.defaults.withCredentials = true;
@@ -176,6 +177,11 @@ function App() {
       try {
         const res = await axios.get(API_BASE_URL + '/api/user/me');
         setCurrentUser(res.data);
+        // Điền lại User Story người dùng đã nhập ở trang chủ trước khi đăng nhập
+        try {
+          const draft = sessionStorage.getItem('pendingUserStory');
+          if (draft) { setUserStory(draft); sessionStorage.removeItem('pendingUserStory'); }
+        } catch { /* sessionStorage không khả dụng */ }
       } catch (err) {
         setCurrentUser(null);
       } finally {
@@ -673,18 +679,8 @@ function App() {
   }
 
   if (!currentUser) {
-    return (
-      <div style={{ display: 'flex', height: '100vh', width: '100vw', justifyContent: 'center', alignItems: 'center', backgroundColor: '#e9ecef', fontFamily: 'system-ui, sans-serif' }}>
-        <div style={{ backgroundColor: '#fff', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', textAlign: 'center', maxWidth: '400px', width: '100%' }}>
-          <h2 style={{ marginBottom: '8px', color: '#212529' }}>{t.loginTitle}</h2>
-          <p style={{ color: '#6c757d', marginBottom: '32px' }}>{t.subtitle}</p>
-          <button onClick={handleLogin} style={{ width: '100%', padding: '12px', backgroundColor: '#4285F4', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" style={{ width: '20px', height: '20px', marginRight: '10px', backgroundColor: '#fff', padding: '4px', borderRadius: '50%' }} />
-            {t.loginBtn}
-          </button>
-        </div>
-      </div>
-    );
+    // Trang chủ công khai: xem giới thiệu & test case nổi bật, mọi thao tác đều yêu cầu đăng nhập
+    return <LandingPage language={language} setLanguage={setLanguage} onLogin={handleLogin} />;
   }
 
   return (
