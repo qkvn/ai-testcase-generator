@@ -80,7 +80,31 @@ const translations = {
     traceMatrix: "Ma trận truy vết (RTM)",
     traceMatrixHint: "Nhấp vào ô để gắn / bỏ liên kết giữa yêu cầu và test case, sau đó bấm \"Lưu thay đổi\".",
     sheetReqs: "Yêu cầu",
-    sheetMatrix: "Ma trận truy vết"
+    sheetMatrix: "Ma trận truy vết",
+    sharedTitle: "Bộ test case được chia sẻ",
+    shareTitle: "Chia sẻ bộ test case",
+    shareCopy: "Sao chép",
+    shareNote: "Bất kỳ ai có đường liên kết đều có thể xem bộ test case này sau khi đăng nhập. Hãy chia sẻ một cách có trách nhiệm.",
+    noHistory: "Chưa có lịch sử nào.",
+    menuShare: "Chia sẻ",
+    menuPin: "Ghim",
+    menuUnpin: "Bỏ ghim",
+    menuRename: "Đổi tên",
+    menuPdf: "Tải bản PDF xuống",
+    menuExcel: "Xuất sang Excel",
+    menuDelete: "Xóa",
+    heroHello: "Xin chào",
+    heroSub: "Hôm nay bạn muốn kiểm thử chức năng nào? Mô tả User Story, AI sẽ sinh test case và ma trận truy vết cho bạn.",
+    suggestions: [
+      { label: "🔐 Đăng nhập", text: "Là người dùng, tôi muốn đăng nhập bằng email và mật khẩu để truy cập hệ thống. Mật khẩu tối thiểu 8 ký tự, sai 5 lần sẽ bị khóa 15 phút." },
+      { label: "🛒 Giỏ hàng", text: "Là khách hàng, tôi muốn thêm sản phẩm vào giỏ hàng, thay đổi số lượng và áp dụng mã giảm giá trước khi thanh toán." },
+      { label: "🔑 Quên mật khẩu", text: "Là người dùng, tôi muốn đặt lại mật khẩu qua email khi quên mật khẩu. Link đặt lại có hiệu lực trong 30 phút." },
+      { label: "📝 Đăng ký", text: "Là khách truy cập, tôi muốn đăng ký tài khoản với họ tên, email, số điện thoại và mật khẩu. Email không được trùng." }
+    ],
+    editHint: "Click đúp vào ô để sửa",
+    generatingTitle: "AI đang phân tích User Story...",
+    generatingSub: "Quá trình này thường mất khoảng 5–15 giây.",
+    emptyHint: "Nhập User Story ở trên hoặc chọn một gợi ý để bắt đầu."
   },
   en: {
     title: "Automated Test Case Generator",
@@ -140,7 +164,31 @@ const translations = {
     traceMatrix: "Requirement Traceability Matrix (RTM)",
     traceMatrixHint: "Click a cell to link / unlink a requirement and a test case, then click \"Save Changes\".",
     sheetReqs: "Requirements",
-    sheetMatrix: "Traceability Matrix"
+    sheetMatrix: "Traceability Matrix",
+    sharedTitle: "Shared test suite",
+    shareTitle: "Share test suite",
+    shareCopy: "Copy",
+    shareNote: "Anyone with the link can view this test suite after signing in. Please share responsibly.",
+    noHistory: "No history yet.",
+    menuShare: "Share",
+    menuPin: "Pin",
+    menuUnpin: "Unpin",
+    menuRename: "Rename",
+    menuPdf: "Download PDF",
+    menuExcel: "Export to Excel",
+    menuDelete: "Delete",
+    heroHello: "Hello",
+    heroSub: "Which feature do you want to test today? Describe a user story and AI will generate test cases and a traceability matrix.",
+    suggestions: [
+      { label: "🔐 Sign in", text: "As a user, I want to sign in with email and password to access the system. Password must be at least 8 characters; 5 wrong attempts lock the account for 15 minutes." },
+      { label: "🛒 Shopping cart", text: "As a customer, I want to add products to my cart, change quantities and apply a discount code before checkout." },
+      { label: "🔑 Forgot password", text: "As a user, I want to reset my password via email when I forget it. The reset link is valid for 30 minutes." },
+      { label: "📝 Sign up", text: "As a visitor, I want to register an account with full name, email, phone number and password. Email must be unique." }
+    ],
+    editHint: "Double-click a cell to edit",
+    generatingTitle: "AI is analyzing the user story...",
+    generatingSub: "This usually takes about 5–15 seconds.",
+    emptyHint: "Enter a user story above or pick a suggestion to get started."
   }
 };
 
@@ -152,7 +200,7 @@ function App() {
   const [language, setLanguage] = useState('vi');
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window === 'undefined' || window.innerWidth > 768);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [chatSessions, setChatSessions] = useState([]);
@@ -384,7 +432,7 @@ function App() {
   const handleCopyLink = () => {
     const shareUrl = window.location.origin + '/?share=' + shareModalSession.id;
     navigator.clipboard.writeText(shareUrl).then(() => {
-      alert("Đã sao chép đường liên kết vào khay nhớ tạm!");
+      alert(language === 'en' ? 'Link copied to clipboard!' : 'Đã sao chép đường liên kết vào khay nhớ tạm!');
     });
   };
 
@@ -432,7 +480,7 @@ function App() {
             handleChangeCell(tc.id, field, e.target.value);
             setEditingCell({ id: null, field: null });
           }}
-          style={{ width: '100%', minHeight: '80px', padding: '8px', boxSizing: 'border-box', border: '2px solid #0d6efd', borderRadius: '6px', outline: 'none', fontSize: '14px', fontFamily: 'inherit' }}
+          style={{ width: '100%', minHeight: '80px', padding: '8px', boxSizing: 'border-box', border: '2px solid #1f4fd8', borderRadius: '8px', outline: 'none', fontSize: '14px', fontFamily: 'inherit', boxShadow: '0 0 0 4px rgba(31,79,216,0.12)' }}
         />
       );
     }
@@ -717,8 +765,11 @@ function App() {
 
   if (isAuthChecking) {
     return (
-      <div style={{ display: 'flex', height: '100vh', width: '100vw', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9fa', fontFamily: 'system-ui, sans-serif' }}>
-        <h3 style={{ color: '#6c757d' }}>{t.checkingAuth}</h3>
+      <div className="app-loading-screen">
+        <style>{appCss}</style>
+        <div className="app-spinner" />
+        <div style={{ marginTop: '16px', fontWeight: 600 }}>🧪 AI TestGen</div>
+        <div style={{ fontSize: '14px', opacity: 0.85, marginTop: '4px' }}>{t.checkingAuth}</div>
       </div>
     );
   }
@@ -728,217 +779,364 @@ function App() {
     return <LandingPage language={language} setLanguage={setLanguage} onLogin={handleLogin} />;
   }
 
+  const firstName = (currentUser.name || '').trim().split(/\s+/).pop() || '';
+  const activeSession = chatSessions.find(s => s.id === (activeSessionId || currentSessionId));
+  const headerTitle = isSharedView ? t.sharedTitle : (activeSessionId && activeSession ? activeSession.title : t.title);
+  const showComposer = !activeSessionId && !isSharedView;
+
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', fontFamily: 'system-ui, sans-serif', backgroundColor: '#f8f9fa' }}>
+    <div className="app-root">
+      <style>{appCss}</style>
 
-      {activeMenuId && <div onClick={() => setActiveMenuId(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9 }}></div>}
-      {showSettingsMenu && <div onClick={() => setShowSettingsMenu(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}></div>}
-      {showPlusMenu && <div onClick={() => setShowPlusMenu(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 8 }}></div>}
+      {activeMenuId && <div onClick={() => setActiveMenuId(null)} className="app-backdrop" style={{ zIndex: 29 }}></div>}
+      {showSettingsMenu && <div onClick={() => setShowSettingsMenu(false)} className="app-backdrop" style={{ zIndex: 30 }}></div>}
+      {showPlusMenu && <div onClick={() => setShowPlusMenu(false)} className="app-backdrop" style={{ zIndex: 8 }}></div>}
 
+      {/* ================= SHARE MODAL ================= */}
       {shareModalSession && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ backgroundColor: '#1e1f22', color: '#e8eaed', padding: '24px', borderRadius: '16px', width: '550px', maxWidth: '90%', position: 'relative', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
-            <button onClick={() => setShareModalSession(null)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: '#9aa0a6', fontSize: '24px', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
-            <h3 style={{ marginTop: 0, marginBottom: '24px', fontSize: '20px', fontWeight: 500, color: '#e8eaed' }}>Đường liên kết công khai có thể chia sẻ</h3>
-            <div style={{ display: 'flex', backgroundColor: '#303134', borderRadius: '24px', padding: '6px 6px 6px 20px', alignItems: 'center', border: '1px solid #5f6368' }}>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '15px', color: '#e8eaed', userSelect: 'all' }}>
-                {window.location.origin + '/?share=' + shareModalSession.id}
-              </span>
-              <button onClick={handleCopyLink} style={{ backgroundColor: '#8ab4f8', color: '#202124', border: 'none', borderRadius: '20px', padding: '10px 20px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', marginLeft: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ marginRight: '6px', fontSize: '16px' }}>⧉</span> Sao chép
-              </button>
-            </div>
-            <p style={{ fontSize: '13px', color: '#9aa0a6', marginTop: '24px', lineHeight: '1.6', borderTop: '1px solid #3c4043', paddingTop: '16px' }}>
-              ⓘ Các đường liên kết công khai có thể được chia sẻ lại. Vì vậy, hãy chia sẻ <span style={{color: '#8ab4f8'}}>một cách có trách nhiệm</span>, xoá bất cứ lúc nào. Nếu bạn chia sẻ với các bên thứ ba, thì chính sách của họ sẽ được áp dụng.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {!isSharedView && (
-        <div style={{ width: isSidebarOpen ? '280px' : '0px', backgroundColor: '#e9ecef', transition: 'width 0.3s ease', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderRight: isSidebarOpen ? '1px solid #dee2e6' : 'none', position: 'relative' }}>
-          <div style={{ padding: '20px 20px 0 20px', minWidth: '280px', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-              <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', marginRight: '12px' }}>☰</button>
-              <button onClick={handleNewChat} style={{ flex: 1, padding: '10px', backgroundColor: '#0d6efd', color: 'white', border: 'none', borderRadius: '20px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '18px', marginRight: '8px' }}>+</span> {t.newChat}
-              </button>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <input type="text" placeholder={"🔍 " + t.search} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ced4da', boxSizing: 'border-box', outline: 'none' }} />
-            </div>
-
-            <h4 style={{ fontSize: '13px', color: '#6c757d', marginBottom: '12px', textTransform: 'uppercase' }}>{t.history}</h4>
-
-            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', marginBottom: '16px' }}>
-              {filteredHistory.map(item => (
-                <div key={item.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', padding: '10px 8px', borderRadius: '8px', marginBottom: '4px', backgroundColor: activeSessionId === item.id ? '#d1e7dd' : 'transparent' }}>
-                  {editingSessionId === item.id ? (
-                    <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} onBlur={() => handleSaveRename(item.id)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRename(item.id); }} autoFocus style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #0d6efd', outline: 'none', fontSize: '14px' }} onClick={(e) => e.stopPropagation()} />
-                  ) : (
-                    <div onClick={() => handleSelectSession(item.id)} style={{ flex: 1, cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#212529', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {item.pinned === true || item.isPinned === true ? "📌 " : "💬 "} {item.title}
-                    </div>
-                  )}
-                  <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === item.id ? null : item.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#6c757d', padding: '0 8px' }}>⋮</button>
-
-                  {activeMenuId === item.id && (
-                    <div style={{ position: 'absolute', top: '36px', right: '10px', backgroundColor: '#fff', border: '1px solid #dee2e6', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, width: '220px', padding: '8px 0' }}>
-                      <div onClick={(e) => { e.stopPropagation(); setShareModalSession(item); setActiveMenuId(null); }} style={menuItemStyle}>🔗 Chia sẻ cuộc trò chuyện</div>
-                      <div onClick={(e) => { e.stopPropagation(); handleTogglePin(item); }} style={menuItemStyle}>{item.pinned === true || item.isPinned === true ? "📍 Bỏ ghim" : "📌 Ghim"}</div>
-                      <div onClick={(e) => { e.stopPropagation(); handleStartRename(item); }} style={menuItemStyle}>✏️ Đổi tên</div>
-                      <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '4px 0' }}></div>
-                      <div onClick={(e) => { e.stopPropagation(); handleSidebarExportPDF(item); }} style={menuItemStyle}>📄 Tải bản PDF xuống</div>
-                      <div onClick={(e) => { e.stopPropagation(); handleSidebarExportExcel(item); }} style={menuItemStyle}>📊 Xuất sang Excel</div>
-                      <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '4px 0' }}></div>
-                      <div onClick={(e) => { e.stopPropagation(); handleDeleteSession(item.id); }} style={{ ...menuItemStyle, color: '#dc3545' }}>🗑️ Xóa</div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ padding: '16px', borderTop: '1px solid #dee2e6', display: 'flex', alignItems: 'center', backgroundColor: '#e9ecef', minWidth: '280px' }}>
-            <img src={currentUser.picture || 'https://via.placeholder.com/40'} alt="Avatar" referrerPolicy="no-referrer" style={{ width: '40px', height: '40px', borderRadius: '50%', marginRight: '12px' }} />
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <div style={{ fontWeight: 600, fontSize: '14px', color: '#212529', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.name}</div>
-              <div style={{ fontSize: '12px', color: '#6c757d', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.email}</div>
-            </div>
-            <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>⚙️</button>
-            {showSettingsMenu && (
-              <div style={{ position: 'absolute', bottom: '70px', right: '16px', backgroundColor: '#fff', border: '1px solid #dee2e6', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', width: '200px', zIndex: 13, padding: '8px 0' }}>
-                <div onClick={handleLogout} style={{ padding: '10px 16px', cursor: 'pointer', color: '#dc3545', fontSize: '14px', fontWeight: 500 }}>🚪 {t.logout}</div>
+        <div className="app-overlay" onClick={() => setShareModalSession(null)}>
+          <div className="app-modal" onClick={(e) => e.stopPropagation()}>
+            <div style={{ height: '6px', background: 'linear-gradient(90deg, #1f4fd8, #7b4fe0)' }} />
+            <div style={{ padding: '22px 24px' }}>
+              <button onClick={() => setShareModalSession(null)} className="app-modal-close" aria-label="close">✕</button>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '19px' }}>🔗 {t.shareTitle}</h3>
+              <p style={{ margin: '0 0 18px 0', color: '#6c757d', fontSize: '14px' }}>{shareModalSession.title}</p>
+              <div className="app-share-box">
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '14px', userSelect: 'all' }}>
+                  {window.location.origin + '/?share=' + shareModalSession.id}
+                </span>
+                <button onClick={handleCopyLink} className="app-btn app-btn-primary" style={{ marginLeft: '10px' }}>⧉ {t.shareCopy}</button>
               </div>
-            )}
+              <p style={{ fontSize: '13px', color: '#6c757d', marginTop: '18px', lineHeight: 1.6, marginBottom: 0 }}>ⓘ {t.shareNote}</p>
+            </div>
           </div>
         </div>
       )}
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflowY: 'auto', backgroundColor: '#ffffff' }}>
-        <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f3f5', position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 5 }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            {!isSharedView && !isSidebarOpen && (<button onClick={() => setIsSidebarOpen(true)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', marginRight: '16px' }}>☰</button>)}
-            {isSharedView && (
-              <button onClick={handleExitSharedView} style={{ background: 'none', border: 'none', fontSize: '14px', fontWeight: 600, color: '#0d6efd', cursor: 'pointer', marginRight: '16px', padding: '6px 12px', borderRadius: '20px', backgroundColor: '#e9ecef' }}>
-                {t.exitShare}
+      {/* ================= SIDEBAR ================= */}
+      {!isSharedView && (
+        <>
+          {isSidebarOpen && <div className="app-sidebar-scrim" onClick={() => setIsSidebarOpen(false)} />}
+          <aside className={'app-sidebar' + (isSidebarOpen ? '' : ' collapsed')}>
+            <div className="app-sidebar-inner">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '19px', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '22px' }}>🧪</span> AI TestGen
+                </div>
+                <button onClick={() => setIsSidebarOpen(false)} className="app-icon-btn app-icon-btn-light" title="Thu gọn">«</button>
+              </div>
+
+              <button onClick={handleNewChat} className="app-btn app-btn-orange" style={{ width: '100%', justifyContent: 'center', padding: '11px' }}>
+                <span style={{ fontSize: '18px', lineHeight: 1 }}>+</span> {t.newChat}
               </button>
+
+              <div className="app-side-search">
+                <span style={{ opacity: 0.8 }}>🔍</span>
+                <input type="text" placeholder={t.search} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              </div>
+
+              <div className="app-side-label">{t.history}</div>
+
+              <div className="app-history">
+                {filteredHistory.length === 0 && <div style={{ fontSize: '13px', opacity: 0.7, padding: '8px 10px' }}>{t.noHistory}</div>}
+                {filteredHistory.map(item => {
+                  const pinned = item.pinned === true || item.isPinned === true;
+                  return (
+                    <div key={item.id} className={'app-history-item' + (activeSessionId === item.id ? ' active' : '')}>
+                      {editingSessionId === item.id ? (
+                        <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} onBlur={() => handleSaveRename(item.id)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRename(item.id); }} autoFocus className="app-rename-input" onClick={(e) => e.stopPropagation()} />
+                      ) : (
+                        <div onClick={() => { handleSelectSession(item.id); if (window.innerWidth < 768) setIsSidebarOpen(false); }} className="app-history-title" title={item.title}>
+                          <span style={{ marginRight: '6px' }}>{pinned ? '📌' : '💬'}</span>{item.title}
+                        </div>
+                      )}
+                      <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === item.id ? null : item.id); }} className="app-history-more">⋮</button>
+
+                      {activeMenuId === item.id && (
+                        <div className="app-menu" style={{ top: '38px', right: '6px' }}>
+                          <div onClick={(e) => { e.stopPropagation(); setShareModalSession(item); setActiveMenuId(null); }} className="app-menu-item">🔗 {t.menuShare}</div>
+                          <div onClick={(e) => { e.stopPropagation(); handleTogglePin(item); }} className="app-menu-item">{pinned ? '📍 ' + t.menuUnpin : '📌 ' + t.menuPin}</div>
+                          <div onClick={(e) => { e.stopPropagation(); handleStartRename(item); }} className="app-menu-item">✏️ {t.menuRename}</div>
+                          <div className="app-menu-sep" />
+                          <div onClick={(e) => { e.stopPropagation(); handleSidebarExportPDF(item); }} className="app-menu-item">📄 {t.menuPdf}</div>
+                          <div onClick={(e) => { e.stopPropagation(); handleSidebarExportExcel(item); }} className="app-menu-item">📊 {t.menuExcel}</div>
+                          <div className="app-menu-sep" />
+                          <div onClick={(e) => { e.stopPropagation(); handleDeleteSession(item.id); }} className="app-menu-item" style={{ color: '#dc3545' }}>🗑️ {t.menuDelete}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="app-user">
+              {currentUser.picture ? (
+                <img src={currentUser.picture} alt="Avatar" referrerPolicy="no-referrer" style={{ width: '38px', height: '38px', borderRadius: '50%', marginRight: '10px', border: '2px solid rgba(255,255,255,0.6)' }} />
+              ) : (
+                <div style={{ width: '38px', height: '38px', borderRadius: '50%', marginRight: '10px', background: '#ff8a00', color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{(firstName || currentUser.email || '?').charAt(0).toUpperCase()}</div>
+              )}
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <div style={{ fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.name}</div>
+                <div style={{ fontSize: '12px', opacity: 0.75, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.email}</div>
+              </div>
+              <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className="app-icon-btn app-icon-btn-light" title="Cài đặt">⚙️</button>
+              {showSettingsMenu && (
+                <div className="app-menu" style={{ bottom: '64px', right: '12px', zIndex: 31 }}>
+                  <div onClick={handleLogout} className="app-menu-item" style={{ color: '#dc3545', fontWeight: 600 }}>🚪 {t.logout}</div>
+                </div>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
+
+      {/* ================= MAIN ================= */}
+      <main className="app-main">
+        <header className="app-topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            {!isSharedView && !isSidebarOpen && (<button onClick={() => setIsSidebarOpen(true)} className="app-icon-btn" title="Menu">☰</button>)}
+            {isSharedView && (
+              <button onClick={handleExitSharedView} className="app-btn app-btn-soft">{t.exitShare}</button>
             )}
-            <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#212529' }}>{t.title}</span>
+            <span className="app-topbar-title" title={headerTitle}>{headerTitle}</span>
           </div>
-          <select value={language} onChange={(e) => { setLanguage(e.target.value); setError(''); }} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #ced4da', fontWeight: 500, cursor: 'pointer' }}>
+          <select value={language} onChange={(e) => { setLanguage(e.target.value); setError(''); }} className="app-lang">
             <option value="vi">🇻🇳 Tiếng Việt</option>
             <option value="en">🇺🇸 English</option>
           </select>
-        </div>
+        </header>
 
-        <div style={{ maxWidth: '900px', width: '100%', margin: '0 auto', padding: '32px 16px' }}>
-          {!activeSessionId && !isSharedView && (
-            <div style={{ marginBottom: '32px', position: 'relative' }}>
-              <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>{t.inputLabel}</label>
-              <div style={{ border: '1px solid #ced4da', borderRadius: '16px', padding: '12px', backgroundColor: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}>
-                <textarea rows={3} style={{ width: '100%', border: 'none', outline: 'none', fontSize: '15px', resize: 'none', boxSizing: 'border-box' }} placeholder={t.placeholder} value={userStory} onChange={(e) => setUserStory(e.target.value)} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', borderTop: '1px solid #f1f3f5', paddingTop: '8px' }}>
-                  <div style={{ position: 'relative' }}>
-                    <button onClick={() => setShowPlusMenu(!showPlusMenu)} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #ced4da', backgroundColor: '#f8f9fa', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+        <div className="app-content">
+          {/* ---------- Ô nhập User Story (banner giống trang chủ) ---------- */}
+          {showComposer && (
+            <section className="app-hero">
+              <h1 className="app-hero-title">{t.heroHello}{firstName ? ', ' + firstName : ''} 👋</h1>
+              <p style={{ margin: '0 0 18px 0', opacity: 0.95, fontSize: '15px' }}>{t.heroSub}</p>
+              <div className="app-composer">
+                <textarea rows={3} placeholder={t.placeholder} value={userStory} onChange={(e) => setUserStory(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !loading) handleGenerate(); }} />
+                <div className="app-composer-bar">
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button onClick={() => setShowPlusMenu(!showPlusMenu)} className="app-plus">+</button>
                     {showPlusMenu && (
-                      <div style={{ position: 'absolute', bottom: '46px', left: 0, backgroundColor: '#fff', border: '1px solid #dee2e6', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', width: '180px', zIndex: 10, padding: '6px 0' }}>
-                        <div onClick={handleFakeUpload} style={{ padding: '10px 16px', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#212529' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
-                          📁 Tải tệp lên...
-                        </div>
+                      <div className="app-menu" style={{ bottom: '46px', left: 0, top: 'auto' }}>
+                        <div onClick={handleFakeUpload} className="app-menu-item">📁 Tải tệp lên...</div>
                       </div>
                     )}
+                    <span className="app-hint">Ctrl + Enter</span>
                   </div>
-                  <button onClick={handleGenerate} disabled={loading} style={{ padding: '10px 24px', backgroundColor: loading ? '#6c757d' : '#0d6efd', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: 600, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
-                    {loading ? t.btnLoading : "✨ " + t.btnGenerate}
+                  <button onClick={handleGenerate} disabled={loading} className="app-btn app-btn-orange app-btn-lg">
+                    {loading ? <><span className="app-spinner app-spinner-sm" /> {t.btnLoading}</> : '✨ ' + t.btnGenerate}
                   </button>
                 </div>
               </div>
-              {error && <p style={{ color: '#dc3545', marginTop: '8px', fontSize: '14px' }}>{error}</p>}
-            </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '14px' }}>
+                {t.suggestions.map((s, i) => (
+                  <button key={i} className="app-chip" onClick={() => setUserStory(s.text)}>{s.label}</button>
+                ))}
+              </div>
+              {error && <div className="app-error">{error}</div>}
+            </section>
           )}
+          {!showComposer && error && <div className="app-error" style={{ marginBottom: '16px' }}>{error}</div>}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h2 style={{ margin: 0, fontSize: '20px' }}>{t.listTitle} ({testCases.length})</h2>
-              {!isSharedView && activeTab === 'testcases' && testCases.length > 0 && <span style={{ fontSize: '13px', color: '#6c757d' }}>(Click đúp vào ô để sửa)</span>}
+          {/* ---------- Danh sách ---------- */}
+          <section className="app-card">
+            <div className="app-card-head">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0, fontSize: '19px' }}>{t.listTitle}</h2>
+                <span className="app-count">{testCases.length}</span>
+                {!isSharedView && activeTab === 'testcases' && testCases.length > 0 && <span style={{ fontSize: '13px', color: '#6c757d' }}>✎ {t.editHint}</span>}
+              </div>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                {hasUnsavedChanges && (
+                  <button onClick={handleSaveChangesDB} disabled={loading} className="app-btn app-btn-primary app-pulse">{t.btnSave}</button>
+                )}
+                {testCases.length > 0 && (
+                  <button onClick={handleMainExportExcel} className="app-btn app-btn-green">{t.btnExport}</button>
+                )}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {hasUnsavedChanges && (
-                <button onClick={handleSaveChangesDB} disabled={loading} style={{ padding: '8px 16px', backgroundColor: '#0dcaf0', color: '#000', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
-                  {t.btnSave}
-                </button>
-              )}
-              {testCases.length > 0 && (
-                <button onClick={handleMainExportExcel} style={{ padding: '8px 16px', backgroundColor: '#198754', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}>
-                  {t.btnExport}
-                </button>
-              )}
-            </div>
-          </div>
 
-          {testCases.length > 0 && (
-            <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #e9ecef', marginBottom: '16px' }}>
-              {[['testcases', t.tabTestCases], ['trace', t.tabTrace]].map(([key, label]) => {
-                const cov = key === 'trace' && requirements.length > 0 ? computeCoverage(requirements, testCases) : null;
-                return (
-                  <button key={key} onClick={() => setActiveTab(key)} style={{ padding: '10px 16px', background: 'none', border: 'none', borderBottom: activeTab === key ? '3px solid #0d6efd' : '3px solid transparent', marginBottom: '-2px', color: activeTab === key ? '#0d6efd' : '#6c757d', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}>
-                    {label}{cov && <span style={{ marginLeft: '6px', padding: '1px 8px', borderRadius: '10px', fontSize: '12px', backgroundColor: cov.percent >= 80 ? '#d1e7dd' : cov.percent >= 50 ? '#ffe5d0' : '#f8d7da', color: '#212529' }}>{cov.percent}%</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+            {testCases.length > 0 && (
+              <div className="app-tabs">
+                {[['testcases', t.tabTestCases], ['trace', t.tabTrace]].map(([key, label]) => {
+                  const cov = key === 'trace' && requirements.length > 0 ? computeCoverage(requirements, testCases) : null;
+                  return (
+                    <button key={key} onClick={() => setActiveTab(key)} className={'app-tab' + (activeTab === key ? ' active' : '')}>
+                      {label}{cov && <span className="app-tab-badge" style={{ backgroundColor: cov.percent >= 80 ? '#d1e7dd' : cov.percent >= 50 ? '#ffe5d0' : '#f8d7da' }}>{cov.percent}%</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-          {testCases.length > 0 && activeTab === 'trace' ? (
-            <TraceabilityPanel
-              t={t}
-              requirements={requirements}
-              testCases={testCases}
-              readOnly={isSharedView}
-              busy={traceBusy}
-              onToggleLink={handleToggleLink}
-              onAnalyze={handleAnalyzeTraceability}
-              onAddRequirement={handleAddRequirement}
-              onUpdateRequirement={handleUpdateRequirement}
-              onDeleteRequirement={handleDeleteRequirement}
-            />
-          ) : testCases.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#f8f9fa', borderRadius: '12px', border: '1px dashed #ced4da', color: '#6c757d' }}>{t.emptyList}</div>
-          ) : (
-            <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #dee2e6' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
-                    <th style={{ padding: '12px', width: '80px' }}>{t.colId}</th>
-                    <th style={{ padding: '12px', width: '25%' }}>{t.colSummary}</th>
-                    <th style={{ padding: '12px', width: '25%' }}>{t.colPrecondition}</th>
-                    <th style={{ padding: '12px' }}>{t.colSteps}</th>
-                    <th style={{ padding: '12px', width: '25%' }}>{t.colExpected}</th>
-                    <th style={{ padding: '12px', width: '110px' }}>{t.colReqs}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {testCases.map((tc, index) => (
-                    <tr key={tc.dbId || index} style={{ borderBottom: '1px solid #e9ecef', verticalAlign: 'top' }}>
-                      <td style={{ padding: '12px', fontWeight: 600, color: '#495057' }}>{tc.id}</td>
-                      <td style={{ padding: '8px' }}>{renderEditableCell(tc, 'summary')}</td>
-                      <td style={{ padding: '8px' }}>{renderEditableCell(tc, 'precondition')}</td>
-                      <td style={{ padding: '8px' }}>{renderEditableCell(tc, 'steps')}</td>
-                      <td style={{ padding: '8px' }}>{renderEditableCell(tc, 'expected_result')}</td>
-                      <td style={{ padding: '8px' }}>{renderEditableCell(tc, 'requirementIds')}</td>
+            {loading && testCases.length === 0 ? (
+              <div className="app-empty">
+                <div className="app-spinner" style={{ borderColor: '#dbe4ff', borderTopColor: '#1f4fd8' }} />
+                <div style={{ fontWeight: 600, marginTop: '14px', color: '#212529' }}>{t.generatingTitle}</div>
+                <div style={{ fontSize: '14px', marginTop: '4px' }}>{t.generatingSub}</div>
+              </div>
+            ) : testCases.length > 0 && activeTab === 'trace' ? (
+              <TraceabilityPanel
+                t={t}
+                requirements={requirements}
+                testCases={testCases}
+                readOnly={isSharedView}
+                busy={traceBusy}
+                onToggleLink={handleToggleLink}
+                onAnalyze={handleAnalyzeTraceability}
+                onAddRequirement={handleAddRequirement}
+                onUpdateRequirement={handleUpdateRequirement}
+                onDeleteRequirement={handleDeleteRequirement}
+              />
+            ) : testCases.length === 0 ? (
+              <div className="app-empty">
+                <div style={{ fontSize: '42px', marginBottom: '8px' }}>🧪</div>
+                <div style={{ fontWeight: 600, color: '#212529' }}>{t.emptyList}</div>
+                {showComposer && <div style={{ fontSize: '14px', marginTop: '4px' }}>{t.emptyHint}</div>}
+              </div>
+            ) : (
+              <div className="app-table-wrap">
+                <table className="app-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '80px' }}>{t.colId}</th>
+                      <th style={{ width: '19%' }}>{t.colSummary}</th>
+                      <th style={{ width: '16%' }}>{t.colPrecondition}</th>
+                      <th style={{ width: '27%' }}>{t.colSteps}</th>
+                      <th style={{ width: '19%' }}>{t.colExpected}</th>
+                      <th style={{ width: '110px' }}>{t.colReqs}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {testCases.map((tc, index) => (
+                      <tr key={tc.dbId || index}>
+                        <td><span className="app-tc-id">{tc.id}</span></td>
+                        <td style={{ fontWeight: 500 }}>{renderEditableCell(tc, 'summary')}</td>
+                        <td>{renderEditableCell(tc, 'precondition')}</td>
+                        <td>{renderEditableCell(tc, 'steps')}</td>
+                        <td>{renderEditableCell(tc, 'expected_result')}</td>
+                        <td>{renderEditableCell(tc, 'requirementIds')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
 
-const menuItemStyle = { padding: '10px 16px', fontSize: '14px', cursor: 'pointer', color: '#212529', transition: 'background 0.2s' };
+// ================= STYLE (đồng bộ màu với trang chủ) =================
+const appCss = `
+.app-root { display: flex; height: 100vh; width: 100vw; overflow: hidden; font-family: system-ui, sans-serif; background: #f4f7fb; color: #212529; }
+.app-backdrop { position: fixed; inset: 0; }
+.app-loading-screen { height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: system-ui, sans-serif; color: #fff; background: linear-gradient(120deg, #1f4fd8 0%, #3b6ff5 45%, #7b4fe0 100%); }
+.app-spinner { width: 38px; height: 38px; border-radius: 50%; border: 4px solid rgba(255,255,255,0.35); border-top-color: #fff; animation: app-spin .8s linear infinite; display: inline-block; box-sizing: border-box; }
+.app-spinner-sm { width: 16px; height: 16px; border-width: 2px; vertical-align: -3px; }
+@keyframes app-spin { to { transform: rotate(360deg); } }
+
+/* ----- Sidebar ----- */
+.app-sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; color: #fff; background: linear-gradient(180deg, #1a3fb8 0%, #1f4fd8 55%, #3b4fd8 100%); transition: width .25s ease, margin .25s ease; overflow: hidden; position: relative; z-index: 20; }
+.app-sidebar.collapsed { width: 0; }
+.app-sidebar-inner { padding: 18px 16px 0; min-width: 280px; box-sizing: border-box; display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.app-side-search { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.16); border-radius: 10px; padding: 9px 12px; margin: 16px 0 18px; }
+.app-side-search input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: #fff; font-size: 14px; }
+.app-side-search input::placeholder { color: rgba(255,255,255,0.75); }
+.app-side-label { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; opacity: .7; margin: 0 0 8px 6px; }
+.app-history { flex: 1; overflow-y: auto; margin: 0 -6px 12px; padding: 0 6px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.3) transparent; }
+.app-history-item { position: relative; display: flex; align-items: center; padding: 9px 6px 9px 10px; border-radius: 10px; margin-bottom: 3px; transition: background .15s; border-left: 3px solid transparent; }
+.app-history-item:hover { background: rgba(255,255,255,0.10); }
+.app-history-item.active { background: rgba(255,255,255,0.20); border-left-color: #ff8a00; }
+.app-history-title { flex: 1; cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-history-more { background: none; border: none; color: #fff; opacity: .6; cursor: pointer; font-size: 16px; padding: 0 6px; border-radius: 6px; }
+.app-history-item:hover .app-history-more, .app-history-item.active .app-history-more { opacity: 1; }
+.app-rename-input { flex: 1; padding: 5px 8px; border-radius: 6px; border: 2px solid #ff8a00; outline: none; font-size: 14px; min-width: 0; }
+.app-user { padding: 12px 14px; display: flex; align-items: center; background: rgba(0,0,0,0.15); min-width: 280px; box-sizing: border-box; position: relative; }
+.app-sidebar-scrim { display: none; }
+
+/* ----- Menu ----- */
+.app-menu { position: absolute; background: #fff; color: #212529; border-radius: 12px; box-shadow: 0 10px 30px rgba(15,23,42,0.18); z-index: 30; width: 220px; padding: 6px; border: 1px solid #eef0f3; }
+.app-menu-item { padding: 9px 12px; font-size: 14px; cursor: pointer; border-radius: 8px; transition: background .15s; }
+.app-menu-item:hover { background: #eef3ff; }
+.app-menu-sep { height: 1px; background: #eef0f3; margin: 4px 6px; }
+
+/* ----- Buttons ----- */
+.app-btn { display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 10px; padding: 9px 16px; font-weight: 600; font-size: 14px; cursor: pointer; transition: transform .15s, background .15s, box-shadow .15s; white-space: nowrap; font-family: inherit; }
+.app-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.app-btn:disabled { opacity: .7; cursor: not-allowed; }
+.app-btn-primary { background: #1f4fd8; color: #fff; box-shadow: 0 4px 12px rgba(31,79,216,0.25); }
+.app-btn-primary:hover:not(:disabled) { background: #1a43bb; }
+.app-btn-orange { background: #ff8a00; color: #fff; box-shadow: 0 4px 12px rgba(255,138,0,0.35); }
+.app-btn-orange:hover:not(:disabled) { background: #f07c00; }
+.app-btn-green { background: #198754; color: #fff; box-shadow: 0 4px 12px rgba(25,135,84,0.22); }
+.app-btn-green:hover { background: #157347; }
+.app-btn-soft { background: #eef3ff; color: #1f4fd8; }
+.app-btn-lg { border-radius: 24px; padding: 11px 24px; font-size: 15px; }
+.app-pulse { animation: app-pulse 1.8s ease-in-out infinite; }
+@keyframes app-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(31,79,216,0.45); } 50% { box-shadow: 0 0 0 6px rgba(31,79,216,0); } }
+.app-icon-btn { width: 36px; height: 36px; border-radius: 10px; border: none; background: #eef3ff; color: #1f4fd8; font-size: 18px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.app-icon-btn-light { background: rgba(255,255,255,0.16); color: #fff; }
+.app-icon-btn-light:hover { background: rgba(255,255,255,0.26); }
+
+/* ----- Main ----- */
+.app-main { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow-y: auto; min-width: 0; }
+.app-topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e6ebf3; }
+.app-topbar-title { font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-lang { padding: 7px 10px; border-radius: 10px; border: 1px solid #dbe4ff; background: #eef3ff; color: #1f4fd8; font-weight: 600; cursor: pointer; }
+.app-content { max-width: 1100px; width: 100%; margin: 0 auto; padding: 24px 20px 40px; box-sizing: border-box; }
+
+.app-hero { background: linear-gradient(120deg, #1f4fd8 0%, #3b6ff5 45%, #7b4fe0 100%); color: #fff; border-radius: 20px; padding: 28px; margin-bottom: 24px; box-shadow: 0 12px 30px rgba(31,79,216,0.25); position: relative; overflow: visible; }
+.app-hero-title { margin: 0 0 6px 0; font-size: 26px; font-weight: 800; letter-spacing: -0.3px; }
+.app-composer { background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); }
+.app-composer textarea { width: 100%; border: none; outline: none; resize: none; font-size: 15px; font-family: inherit; color: #212529; box-sizing: border-box; }
+.app-composer-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; border-top: 1px solid #f1f3f5; padding-top: 10px; flex-wrap: wrap; }
+.app-plus { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #dbe4ff; background: #eef3ff; color: #1f4fd8; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.app-hint { font-size: 12px; color: #6c757d; background: #f1f3f5; padding: 3px 8px; border-radius: 6px; }
+.app-chip { background: rgba(255,255,255,0.18); color: #fff; border: 1px solid rgba(255,255,255,0.35); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; font-family: inherit; }
+.app-chip:hover { background: rgba(255,255,255,0.3); }
+.app-error { margin-top: 12px; background: #fff; color: #dc3545; padding: 10px 14px; border-radius: 10px; font-size: 14px; border: 1px solid #f5c2c7; }
+
+.app-card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 18px rgba(15,23,42,0.06); border: 1px solid #eef0f3; }
+.app-card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.app-count { background: #eef3ff; color: #1f4fd8; font-weight: 700; font-size: 13px; padding: 2px 10px; border-radius: 12px; }
+.app-tabs { display: inline-flex; gap: 4px; background: #f1f4fa; padding: 4px; border-radius: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.app-tab { padding: 8px 16px; border: none; background: none; border-radius: 9px; color: #495057; font-weight: 600; font-size: 14px; cursor: pointer; transition: background .15s, color .15s; font-family: inherit; }
+.app-tab:hover { color: #1f4fd8; }
+.app-tab.active { background: linear-gradient(120deg, #1f4fd8, #5b5fe6); color: #fff; box-shadow: 0 4px 12px rgba(31,79,216,0.25); }
+.app-tab-badge { margin-left: 8px; padding: 1px 8px; border-radius: 10px; font-size: 12px; color: #212529; }
+.app-empty { text-align: center; padding: 48px 20px; background: #f8faff; border-radius: 14px; border: 2px dashed #dbe4ff; color: #6c757d; }
+
+.app-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid #e6ebf3; }
+.app-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+.app-table thead th { background: #eef3ff; color: #1f4fd8; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; padding: 12px; font-weight: 700; border-bottom: 1px solid #dbe4ff; white-space: nowrap; }
+.app-table tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f3f5; vertical-align: top; }
+.app-table tbody tr { transition: background .15s; }
+.app-table tbody tr:hover { background: #f8faff; }
+.app-table tbody tr:last-child td { border-bottom: none; }
+.app-tc-id { display: inline-block; background: #eef3ff; color: #1f4fd8; font-weight: 700; font-size: 12px; padding: 3px 9px; border-radius: 8px; margin-top: 4px; white-space: nowrap; }
+
+/* ----- Modal ----- */
+.app-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.app-modal { position: relative; background: #fff; border-radius: 16px; width: 100%; max-width: 540px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+.app-modal-close { position: absolute; top: 18px; right: 16px; background: none; border: none; font-size: 18px; color: #6c757d; cursor: pointer; }
+.app-share-box { display: flex; align-items: center; background: #f4f7fb; border: 1px solid #dbe4ff; border-radius: 12px; padding: 6px 6px 6px 14px; }
+
+/* ----- Mobile ----- */
+@media (max-width: 768px) {
+  .app-sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 40; box-shadow: 4px 0 24px rgba(0,0,0,0.25); }
+  .app-sidebar-scrim { display: block; position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 39; }
+  .app-topbar { padding: 10px 14px; }
+  .app-content { padding: 16px 12px 32px; }
+  .app-hero { padding: 20px 16px; border-radius: 16px; }
+  .app-hero-title { font-size: 21px; }
+  .app-card { padding: 14px; }
+}
+`;
+
 export default App;

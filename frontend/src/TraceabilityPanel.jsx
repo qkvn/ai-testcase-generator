@@ -25,18 +25,18 @@ export default function TraceabilityPanel({
 
   const actionBar = !readOnly && (
     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-      <button onClick={onAnalyze} disabled={busy} style={btn(busy ? '#6c757d' : '#6f42c1')}>
+      <button onClick={onAnalyze} disabled={busy} style={btn(busy ? '#6c757d' : '#7b4fe0')}>
         {busy ? t.traceAnalyzing : '🤖 ' + t.traceAnalyze}
       </button>
       {requirements.length > 0 && (
-        <button onClick={() => setShowAdd(v => !v)} disabled={busy} style={btn('#0d6efd')}>+ {t.traceAddReq}</button>
+        <button onClick={() => setShowAdd(v => !v)} disabled={busy} style={btn('#1f4fd8')}>+ {t.traceAddReq}</button>
       )}
     </div>
   );
 
   if (requirements.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px 24px', backgroundColor: '#f8f9fa', borderRadius: '12px', border: '1px dashed #ced4da', color: '#6c757d' }}>
+      <div style={{ textAlign: 'center', padding: '40px 24px', backgroundColor: '#f8faff', borderRadius: '14px', border: '2px dashed #dbe4ff', color: '#6c757d' }}>
         <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔗</div>
         <p style={{ margin: '0 0 16px 0' }}>{testCases.length === 0 ? t.emptyList : t.traceEmpty}</p>
         {testCases.length > 0 && <div style={{ display: 'flex', justifyContent: 'center' }}>{actionBar}</div>}
@@ -96,10 +96,10 @@ export default function TraceabilityPanel({
         </div>
       )}
 
-      <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #dee2e6' }}>
+      <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e6ebf3' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
           <thead>
-            <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+            <tr style={{ backgroundColor: '#eef3ff', color: '#1f4fd8', borderBottom: '1px solid #dbe4ff' }}>
               <th style={th}>{t.traceColCode}</th>
               <th style={th}>{t.traceColDesc}</th>
               <th style={th}>{t.traceColPriority}</th>
@@ -118,7 +118,7 @@ export default function TraceabilityPanel({
                     {editingReqId === r.dbId ? (
                       <textarea autoFocus defaultValue={r.description}
                         onBlur={e => { setEditingReqId(null); if (e.target.value !== r.description) onUpdateRequirement(r, { description: e.target.value }); }}
-                        style={{ width: '100%', minHeight: '60px', padding: '6px', boxSizing: 'border-box', border: '2px solid #0d6efd', borderRadius: '6px', outline: 'none', fontFamily: 'inherit', fontSize: '14px' }} />
+                        style={{ width: '100%', minHeight: '60px', padding: '6px', boxSizing: 'border-box', border: '2px solid #1f4fd8', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', fontSize: '14px' }} />
                     ) : (
                       <div onDoubleClick={() => !readOnly && setEditingReqId(r.dbId)} style={{ whiteSpace: 'pre-wrap', cursor: readOnly ? 'default' : 'text' }}>{r.description}</div>
                     )}
@@ -156,11 +156,11 @@ export default function TraceabilityPanel({
       {/* ---------- Ma trận truy vết ---------- */}
       <h3 style={{ margin: '28px 0 4px', fontSize: '17px' }}>{t.traceMatrix}</h3>
       {!readOnly && <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#6c757d' }}>{t.traceMatrixHint}</p>}
-      <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #dee2e6', marginBottom: '24px' }}>
+      <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e6ebf3', marginBottom: '24px' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: '13px', minWidth: '100%' }}>
           <thead>
-            <tr style={{ backgroundColor: '#f8f9fa' }}>
-              <th style={{ ...mth, position: 'sticky', left: 0, backgroundColor: '#f8f9fa', zIndex: 1, textAlign: 'left', minWidth: '90px' }}>{t.traceColCode} \ TC</th>
+            <tr style={{ backgroundColor: '#eef3ff', color: '#1f4fd8' }}>
+              <th style={{ ...mth, position: 'sticky', left: 0, backgroundColor: '#eef3ff', zIndex: 1, textAlign: 'left', minWidth: '90px' }}>{t.traceColCode} \ TC</th>
               {testCases.map((tc, i) => <th key={tc.dbId || i} title={tc.summary} style={mth}>{tc.id}</th>)}
               <th style={{ ...mth, backgroundColor: '#e9ecef' }}>Σ</th>
             </tr>
@@ -186,7 +186,7 @@ export default function TraceabilityPanel({
                 </tr>
               );
             })}
-            <tr style={{ backgroundColor: '#f8f9fa' }}>
+            <tr style={{ backgroundColor: '#eef3ff', color: '#1f4fd8' }}>
               <td style={{ ...mtd, position: 'sticky', left: 0, backgroundColor: '#e9ecef', fontWeight: 600, textAlign: 'left', zIndex: 1 }}>Σ</td>
               {testCases.map((tc, i) => {
                 const n = (tc.requirementIds || []).filter(c => cov.byReq[c]).length;
@@ -201,8 +201,8 @@ export default function TraceabilityPanel({
   );
 }
 
-const btn = (bg) => ({ padding: '8px 14px', backgroundColor: bg, color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 500, fontSize: '14px', cursor: 'pointer' });
-const card = { padding: '16px', borderRadius: '10px', border: '1px solid #dee2e6', backgroundColor: '#fff' };
+const btn = (bg) => ({ padding: '8px 14px', backgroundColor: bg, color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 600, boxShadow: '0 4px 12px rgba(31,79,216,0.18)', fontSize: '14px', cursor: 'pointer' });
+const card = { padding: '16px', borderRadius: '14px', border: '1px solid #e6ebf3', backgroundColor: '#f8faff' };
 const cardLabel = { fontSize: '12px', color: '#6c757d', textTransform: 'uppercase', fontWeight: 600, marginBottom: '6px' };
 const alertBox = { padding: '10px 14px', borderRadius: '8px', border: '1px solid', fontSize: '14px', marginBottom: '8px' };
 const th = { padding: '10px 12px', whiteSpace: 'nowrap' };
