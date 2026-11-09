@@ -4,6 +4,8 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import TraceabilityPanel from './TraceabilityPanel';
+import { computeCoverage, parseRequirementIds } from './traceability';
 
 axios.defaults.withCredentials = true;
 
@@ -37,7 +39,39 @@ const translations = {
     loginBtn: "Đăng nhập bằng Google",
     logout: "Đăng xuất",
     exitShare: "← Thoát chế độ xem chung",
-    saveSuccess: "Đã lưu các thay đổi thành công!"
+    saveSuccess: "Đã lưu các thay đổi thành công!",
+    colReqs: "Yêu cầu",
+    tabTestCases: "📋 Test Cases",
+    tabTrace: "🔗 Truy vết & Độ bao phủ",
+    traceAnalyze: "AI phân tích truy vết",
+    traceAnalyzing: "AI đang phân tích...",
+    traceAnalyzeConfirm: "AI sẽ phân tích lại danh sách yêu cầu và thay thế toàn bộ liên kết hiện tại. Tiếp tục?",
+    traceUnsavedFirst: "Bạn có thay đổi chưa lưu. Hãy bấm \"Lưu thay đổi\" trước khi phân tích.",
+    traceNoSession: "Không xác định được phiên hiện tại.",
+    traceEmpty: "Phiên này chưa có danh sách yêu cầu. Hãy để AI phân tích User Story và test case để tạo ma trận truy vết.",
+    traceAddReq: "Thêm yêu cầu",
+    traceAddBtn: "Thêm",
+    traceNewReqPlaceholder: "Mô tả yêu cầu mới...",
+    traceCoverage: "Độ bao phủ yêu cầu",
+    traceReqCovered: "yêu cầu đã được kiểm thử",
+    traceUncovered: "Yêu cầu chưa bao phủ",
+    traceOrphans: "Test case chưa gắn yêu cầu",
+    traceUncoveredWarn: "Các yêu cầu chưa có test case:",
+    traceOrphanWarn: "Test case chưa truy vết tới yêu cầu nào:",
+    traceReqList: "Danh sách yêu cầu",
+    traceColCode: "Mã YC",
+    traceColDesc: "Mô tả yêu cầu",
+    traceColPriority: "Ưu tiên",
+    traceColLinked: "Test case liên kết",
+    traceColStatus: "Trạng thái",
+    traceCovered: "Đã bao phủ",
+    traceNotCovered: "Chưa bao phủ",
+    traceDelete: "Xóa yêu cầu",
+    traceDeleteConfirm: "Xóa yêu cầu này và gỡ liên kết khỏi các test case?",
+    traceMatrix: "Ma trận truy vết (RTM)",
+    traceMatrixHint: "Nhấp vào ô để gắn / bỏ liên kết giữa yêu cầu và test case, sau đó bấm \"Lưu thay đổi\".",
+    sheetReqs: "Yêu cầu",
+    sheetMatrix: "Ma trận truy vết"
   },
   en: {
     title: "Automated Test Case Generator",
@@ -65,7 +99,39 @@ const translations = {
     loginBtn: "Login with Google",
     logout: "Logout",
     exitShare: "← Exit Shared View",
-    saveSuccess: "Changes saved successfully!"
+    saveSuccess: "Changes saved successfully!",
+    colReqs: "Requirements",
+    tabTestCases: "📋 Test Cases",
+    tabTrace: "🔗 Traceability & Coverage",
+    traceAnalyze: "AI traceability analysis",
+    traceAnalyzing: "AI analyzing...",
+    traceAnalyzeConfirm: "AI will re-analyze the requirements and replace all current links. Continue?",
+    traceUnsavedFirst: "You have unsaved changes. Please click \"Save Changes\" before analyzing.",
+    traceNoSession: "Cannot determine the current session.",
+    traceEmpty: "This session has no requirements yet. Let AI analyze the user story and test cases to build the traceability matrix.",
+    traceAddReq: "Add requirement",
+    traceAddBtn: "Add",
+    traceNewReqPlaceholder: "New requirement description...",
+    traceCoverage: "Requirement coverage",
+    traceReqCovered: "requirements tested",
+    traceUncovered: "Uncovered requirements",
+    traceOrphans: "Unlinked test cases",
+    traceUncoveredWarn: "Requirements without test cases:",
+    traceOrphanWarn: "Test cases not traced to any requirement:",
+    traceReqList: "Requirements",
+    traceColCode: "Req ID",
+    traceColDesc: "Description",
+    traceColPriority: "Priority",
+    traceColLinked: "Linked test cases",
+    traceColStatus: "Status",
+    traceCovered: "Covered",
+    traceNotCovered: "Not covered",
+    traceDelete: "Delete requirement",
+    traceDeleteConfirm: "Delete this requirement and unlink it from all test cases?",
+    traceMatrix: "Requirement Traceability Matrix (RTM)",
+    traceMatrixHint: "Click a cell to link / unlink a requirement and a test case, then click \"Save Changes\".",
+    sheetReqs: "Requirements",
+    sheetMatrix: "Traceability Matrix"
   }
 };
 
@@ -96,6 +162,12 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+
+  // Truy vết yêu cầu
+  const [requirements, setRequirements] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null); // phiên đang hiển thị (kể cả phiên vừa sinh)
+  const [activeTab, setActiveTab] = useState('testcases');
+  const [traceBusy, setTraceBusy] = useState(false);
 
   const t = translations[language];
 
@@ -147,7 +219,10 @@ function App() {
 
   const handleNewChat = () => {
     setActiveSessionId(null);
+    setCurrentSessionId(null);
     setTestCases([]);
+    setRequirements([]);
+    setActiveTab('testcases');
     setUserStory('');
     setError('');
     setHasUnsavedChanges(false);
@@ -164,12 +239,17 @@ function App() {
 
   const fetchTestCasesOnly = async (sessionId) => {
     setActiveSessionId(sessionId);
+    setCurrentSessionId(sessionId);
     setLoading(true);
     setError('');
     setHasUnsavedChanges(false);
     try {
-      const res = await axios.get(API_BASE_URL + '/api/sessions/' + sessionId + '/testcases');
-      setTestCases(res.data);
+      const [tcRes, reqRes] = await Promise.all([
+        axios.get(API_BASE_URL + '/api/sessions/' + sessionId + '/testcases'),
+        axios.get(API_BASE_URL + '/api/sessions/' + sessionId + '/requirements').catch(() => ({ data: [] }))
+      ]);
+      setTestCases(tcRes.data);
+      setRequirements(reqRes.data || []);
     } catch (err) {
       setError("Lỗi tải test case: " + (err.response?.data?.message || err.message));
     } finally {
@@ -196,7 +276,9 @@ function App() {
       const res = await axios.post(API_BASE_URL + '/api/generate?lang=' + language, userStory, {
         headers: { 'Content-Type': 'text/plain' }
       });
-      setTestCases(res.data);
+      setTestCases(res.data.testCases || []);
+      setRequirements(res.data.requirements || []);
+      setCurrentSessionId(res.data.sessionId || null);
       setUserStory('');
       setHasUnsavedChanges(false);
       await fetchSessions();
@@ -264,6 +346,7 @@ function App() {
       if (tc.id === id) {
         let newValue = value;
         if (field === 'steps') newValue = value.split('\n').filter(s => s.trim() !== '');
+        if (field === 'requirementIds') newValue = parseRequirementIds(value);
         return { ...tc, [field]: newValue };
       }
       return tc;
@@ -290,7 +373,8 @@ function App() {
   const renderEditableCell = (tc, field) => {
     const isEditing = editingCell.id === tc.id && editingCell.field === field;
     if (isEditing) {
-      const val = field === 'steps' ? (tc[field] ? tc[field].join('\n') : '') : tc[field];
+      const val = field === 'steps' ? (tc[field] ? tc[field].join('\n') : '')
+        : field === 'requirementIds' ? (tc[field] || []).join(', ') : tc[field];
       return (
         <textarea
           autoFocus
@@ -301,6 +385,17 @@ function App() {
           }}
           style={{ width: '100%', minHeight: '80px', padding: '8px', boxSizing: 'border-box', border: '2px solid #0d6efd', borderRadius: '6px', outline: 'none', fontSize: '14px', fontFamily: 'inherit' }}
         />
+      );
+    }
+
+    if (field === 'requirementIds') {
+      const ids = tc.requirementIds || [];
+      return (
+        <div onDoubleClick={() => handleDoubleClickCell(tc.id, field)} title={isSharedView ? '' : 'REQ-01, REQ-02'} style={{ minHeight: '30px', cursor: isSharedView ? 'default' : 'text', padding: '4px' }}>
+          {ids.length ? ids.map(id => (
+            <span key={id} style={{ display: 'inline-block', padding: '2px 8px', margin: '0 4px 4px 0', borderRadius: '10px', fontSize: '12px', fontWeight: 600, backgroundColor: '#e7f1ff', color: '#084298' }}>{id}</span>
+          )) : <span style={{ color: '#adb5bd' }}>—</span>}
+        </div>
       );
     }
 
@@ -319,14 +414,97 @@ function App() {
     );
   };
 
-  const generateFormattedExcel = async (dataToExport, fileNameSuffix) => {
+  // ================== TRUY VẾT YÊU CẦU ==================
+  const handleToggleLink = (tc, code) => {
+    setTestCases(prev => prev.map(item => {
+      if (item !== tc) return item;
+      const ids = item.requirementIds || [];
+      const next = ids.includes(code) ? ids.filter(c => c !== code) : [...ids, code];
+      return { ...item, requirementIds: next };
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const errMsg = (err) => {
+    const d = err.response?.data;
+    return (d && (d.message || (typeof d === 'string' ? d : ''))) || err.message;
+  };
+
+  const handleAnalyzeTraceability = async () => {
+    if (!currentSessionId) { alert(t.traceNoSession); return; }
+    if (hasUnsavedChanges) { alert(t.traceUnsavedFirst); return; }
+    if (requirements.length > 0 && !window.confirm(t.traceAnalyzeConfirm)) return;
+    setTraceBusy(true);
+    try {
+      await axios.post(API_BASE_URL + '/api/sessions/' + currentSessionId + '/traceability/analyze?lang=' + language);
+      const [tcRes, reqRes] = await Promise.all([
+        axios.get(API_BASE_URL + '/api/sessions/' + currentSessionId + '/testcases'),
+        axios.get(API_BASE_URL + '/api/sessions/' + currentSessionId + '/requirements')
+      ]);
+      setTestCases(tcRes.data);
+      setRequirements(reqRes.data);
+    } catch (err) {
+      alert(t.errConnect + errMsg(err));
+    } finally {
+      setTraceBusy(false);
+    }
+  };
+
+  const handleAddRequirement = async (data) => {
+    if (!currentSessionId) { alert(t.traceNoSession); return; }
+    try {
+      const res = await axios.post(API_BASE_URL + '/api/sessions/' + currentSessionId + '/requirements', data);
+      setRequirements(prev => [...prev, res.data]);
+    } catch (err) {
+      alert(t.errConnect + errMsg(err));
+    }
+  };
+
+  const handleUpdateRequirement = async (req, changes) => {
+    setRequirements(prev => prev.map(r => r.dbId === req.dbId ? { ...r, ...changes } : r));
+    try {
+      await axios.put(API_BASE_URL + '/api/requirements/' + req.dbId, { ...req, ...changes });
+    } catch (err) {
+      setRequirements(prev => prev.map(r => r.dbId === req.dbId ? req : r));
+      alert(t.errConnect + errMsg(err));
+    }
+  };
+
+  const handleDeleteRequirement = async (req) => {
+    if (!window.confirm(t.traceDeleteConfirm)) return;
+    try {
+      await axios.delete(API_BASE_URL + '/api/requirements/' + req.dbId);
+      setRequirements(prev => prev.filter(r => r.dbId !== req.dbId));
+      setTestCases(prev => prev.map(tc => ({ ...tc, requirementIds: (tc.requirementIds || []).filter(c => c !== req.code) })));
+    } catch (err) {
+      alert(t.errConnect + errMsg(err));
+    }
+  };
+
+  const styleHeaderRow = (row) => {
+    row.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+    row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D6EFD' } };
+    row.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    row.height = 30;
+  };
+
+  const addBorders = (worksheet) => {
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      });
+    });
+  };
+
+  const generateFormattedExcel = async (dataToExport, fileNameSuffix, reqs = []) => {
     if (!dataToExport || dataToExport.length === 0) { alert("Không có dữ liệu!"); return; }
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Test Cases');
     worksheet.columns = [
       { header: t.colId, key: 'id', width: 12 }, { header: t.colSummary, key: 'summary', width: 40 },
       { header: t.colPrecondition, key: 'precondition', width: 35 }, { header: t.colSteps, key: 'steps', width: 55 },
-      { header: t.colExpected, key: 'expected', width: 45 }
+      { header: t.colExpected, key: 'expected', width: 45 },
+      { header: t.colReqs, key: 'reqs', width: 18 }
     ];
     const headerRow = worksheet.getRow(1);
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
@@ -336,7 +514,7 @@ function App() {
 
     dataToExport.forEach(tc => {
       const stepsText = tc.steps ? tc.steps.map((step, idx) => `${idx + 1}. ${step}`).join('\n') : '';
-      worksheet.addRow({ id: tc.id, summary: tc.summary, precondition: tc.precondition, steps: stepsText, expected: tc.expected_result });
+      worksheet.addRow({ id: tc.id, summary: tc.summary, precondition: tc.precondition, steps: stepsText, expected: tc.expected_result, reqs: (tc.requirementIds || []).join(', ') });
     });
 
     worksheet.eachRow((row, rowNumber) => {
@@ -346,19 +524,70 @@ function App() {
       });
     });
 
+    // Sheet Yêu cầu + Ma trận truy vết (nếu phiên có danh sách yêu cầu)
+    if (reqs && reqs.length > 0) {
+      const cov = computeCoverage(reqs, dataToExport);
+
+      const reqSheet = workbook.addWorksheet(t.sheetReqs);
+      reqSheet.columns = [
+        { header: t.traceColCode, key: 'code', width: 12 }, { header: t.traceColDesc, key: 'desc', width: 60 },
+        { header: t.traceColPriority, key: 'priority', width: 12 }, { header: t.traceColLinked, key: 'linked', width: 30 },
+        { header: t.traceColStatus, key: 'status', width: 16 }
+      ];
+      styleHeaderRow(reqSheet.getRow(1));
+      reqs.forEach(r => {
+        const linked = cov.byReq[r.code] || [];
+        const row = reqSheet.addRow({ code: r.code, desc: r.description, priority: r.priority, linked: linked.join(', '), status: linked.length ? t.traceCovered : t.traceNotCovered });
+        row.alignment = { vertical: 'top', wrapText: true };
+        if (!linked.length) row.getCell('status').font = { bold: true, color: { argb: 'FFDC3545' } };
+      });
+      addBorders(reqSheet);
+      reqSheet.addRow({});
+      const sumRow = reqSheet.addRow({ code: t.traceCoverage, desc: `${cov.percent}% (${cov.covered}/${cov.total})` });
+      sumRow.font = { bold: true };
+
+      const matrix = workbook.addWorksheet(t.sheetMatrix);
+      matrix.columns = [
+        { header: t.traceColCode + ' / TC', key: 'code', width: 16 },
+        ...dataToExport.map((tc, i) => ({ header: tc.id, key: 'tc' + i, width: 10 })),
+        { header: 'Σ', key: 'total', width: 8 }
+      ];
+      styleHeaderRow(matrix.getRow(1));
+      reqs.forEach(r => {
+        const rowData = { code: r.code, total: (cov.byReq[r.code] || []).length };
+        dataToExport.forEach((tc, i) => { rowData['tc' + i] = (tc.requirementIds || []).includes(r.code) ? '✔' : ''; });
+        const row = matrix.addRow(rowData);
+        row.eachCell({ includeEmpty: true }, (cell, col) => {
+          cell.alignment = { vertical: 'middle', horizontal: col === 1 ? 'left' : 'center' };
+          if (cell.value === '✔') cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1E7DD' } };
+        });
+        if (!rowData.total) row.getCell('code').font = { bold: true, color: { argb: 'FFDC3545' } };
+      });
+      matrix.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
+      addBorders(matrix);
+    }
+
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, `TestCases_${fileNameSuffix}.xlsx`);
   };
 
-  const handleMainExportExcel = () => generateFormattedExcel(testCases, "HienTai");
+  const handleMainExportExcel = () => generateFormattedExcel(testCases, "HienTai", requirements);
+
+  const fetchSessionRequirements = async (sessionId) => {
+    try {
+      const res = await axios.get(API_BASE_URL + '/api/sessions/' + sessionId + '/requirements');
+      return res.data || [];
+    } catch { return []; }
+  };
 
   const handleSidebarExportExcel = async (session) => {
     setActiveMenuId(null);
     try {
       const res = await axios.get(API_BASE_URL + '/api/sessions/' + session.id + '/testcases');
       let safeTitle = session.title.replace(/[\/\\?%*:|"<>]/g, '-').substring(0, 30);
-      generateFormattedExcel(res.data, safeTitle);
+      const reqs = await fetchSessionRequirements(session.id);
+      generateFormattedExcel(res.data, safeTitle, reqs);
     } catch (err) { alert("Lỗi tải dữ liệu: " + (err.response?.data?.message || err.message)); }
   };
 
@@ -389,11 +618,11 @@ function App() {
       await loadFont('/arialbd.ttf', 'arialbd.ttf', 'Arial', 'bold');
       doc.setFont('Arial', 'normal');
 
-      const tableColumn = [ t.colId, t.colSummary, t.colPrecondition, t.colSteps, t.colExpected ];
+      const tableColumn = [ t.colId, t.colSummary, t.colPrecondition, t.colSteps, t.colExpected, t.colReqs ];
       const tableRows = [];
       data.forEach(tc => {
         const stepsText = tc.steps ? tc.steps.map((step, idx) => `${idx + 1}. ${step}`).join('\n') : '';
-        tableRows.push([ tc.id, tc.summary, tc.precondition, stepsText, tc.expected_result ]);
+        tableRows.push([ tc.id, tc.summary, tc.precondition, stepsText, tc.expected_result, (tc.requirementIds || []).join(', ') ]);
       });
 
       doc.setFont('Arial', 'bold');
@@ -402,8 +631,33 @@ function App() {
         head: [tableColumn], body: tableRows, startY: 20,
         styles: { font: 'Arial', fontSize: 10, cellPadding: 3, overflow: 'linebreak' },
         headStyles: { fillColor: [13, 110, 253] },
-        columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 60 }, 2: { cellWidth: 50 }, 3: { cellWidth: 80 }, 4: { cellWidth: 60 } }
+        columnStyles: { 0: { cellWidth: 18 }, 1: { cellWidth: 50 }, 2: { cellWidth: 42 }, 3: { cellWidth: 74 }, 4: { cellWidth: 52 }, 5: { cellWidth: 32 } }
       });
+
+      // Trang báo cáo truy vết & độ bao phủ
+      const reqs = await fetchSessionRequirements(session.id);
+      if (reqs.length > 0) {
+        const cov = computeCoverage(reqs, data);
+        doc.addPage();
+        doc.setFont('Arial', 'bold');
+        doc.text(`${t.traceMatrix} - ${t.traceCoverage}: ${cov.percent}% (${cov.covered}/${cov.total})`, 14, 15);
+        autoTable(doc, {
+          head: [[t.traceColCode, t.traceColDesc, t.traceColPriority, t.traceColLinked, t.traceColStatus]],
+          body: reqs.map(r => {
+            const linked = cov.byReq[r.code] || [];
+            return [r.code, r.description, r.priority, linked.join(', '), linked.length ? t.traceCovered : t.traceNotCovered];
+          }),
+          startY: 20,
+          styles: { font: 'Arial', fontSize: 10, cellPadding: 3, overflow: 'linebreak' },
+          headStyles: { fillColor: [111, 66, 193] },
+          columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 120 }, 2: { cellWidth: 22 }, 3: { cellWidth: 70 }, 4: { cellWidth: 34 } },
+          didParseCell: (hook) => {
+            if (hook.section === 'body' && hook.column.index === 4 && hook.cell.raw === t.traceNotCovered) {
+              hook.cell.styles.textColor = [220, 53, 69];
+            }
+          }
+        });
+      }
 
       let safeTitle = session.title.replace(/[\/\\?%*:|"<>]/g, '-').substring(0, 30);
       doc.save(`TestCases_${safeTitle}.pdf`);
@@ -567,7 +821,7 @@ function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <h2 style={{ margin: 0, fontSize: '20px' }}>{t.listTitle} ({testCases.length})</h2>
-              {!isSharedView && !activeSessionId && <span style={{ fontSize: '13px', color: '#6c757d' }}>(Click đúp vào ô để sửa)</span>}
+              {!isSharedView && activeTab === 'testcases' && testCases.length > 0 && <span style={{ fontSize: '13px', color: '#6c757d' }}>(Click đúp vào ô để sửa)</span>}
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
               {hasUnsavedChanges && (
@@ -583,7 +837,33 @@ function App() {
             </div>
           </div>
 
-          {testCases.length === 0 ? (
+          {testCases.length > 0 && (
+            <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #e9ecef', marginBottom: '16px' }}>
+              {[['testcases', t.tabTestCases], ['trace', t.tabTrace]].map(([key, label]) => {
+                const cov = key === 'trace' && requirements.length > 0 ? computeCoverage(requirements, testCases) : null;
+                return (
+                  <button key={key} onClick={() => setActiveTab(key)} style={{ padding: '10px 16px', background: 'none', border: 'none', borderBottom: activeTab === key ? '3px solid #0d6efd' : '3px solid transparent', marginBottom: '-2px', color: activeTab === key ? '#0d6efd' : '#6c757d', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}>
+                    {label}{cov && <span style={{ marginLeft: '6px', padding: '1px 8px', borderRadius: '10px', fontSize: '12px', backgroundColor: cov.percent >= 80 ? '#d1e7dd' : cov.percent >= 50 ? '#ffe5d0' : '#f8d7da', color: '#212529' }}>{cov.percent}%</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {testCases.length > 0 && activeTab === 'trace' ? (
+            <TraceabilityPanel
+              t={t}
+              requirements={requirements}
+              testCases={testCases}
+              readOnly={isSharedView}
+              busy={traceBusy}
+              onToggleLink={handleToggleLink}
+              onAnalyze={handleAnalyzeTraceability}
+              onAddRequirement={handleAddRequirement}
+              onUpdateRequirement={handleUpdateRequirement}
+              onDeleteRequirement={handleDeleteRequirement}
+            />
+          ) : testCases.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#f8f9fa', borderRadius: '12px', border: '1px dashed #ced4da', color: '#6c757d' }}>{t.emptyList}</div>
           ) : (
             <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #dee2e6' }}>
@@ -595,6 +875,7 @@ function App() {
                     <th style={{ padding: '12px', width: '25%' }}>{t.colPrecondition}</th>
                     <th style={{ padding: '12px' }}>{t.colSteps}</th>
                     <th style={{ padding: '12px', width: '25%' }}>{t.colExpected}</th>
+                    <th style={{ padding: '12px', width: '110px' }}>{t.colReqs}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -605,6 +886,7 @@ function App() {
                       <td style={{ padding: '8px' }}>{renderEditableCell(tc, 'precondition')}</td>
                       <td style={{ padding: '8px' }}>{renderEditableCell(tc, 'steps')}</td>
                       <td style={{ padding: '8px' }}>{renderEditableCell(tc, 'expected_result')}</td>
+                      <td style={{ padding: '8px' }}>{renderEditableCell(tc, 'requirementIds')}</td>
                     </tr>
                   ))}
                 </tbody>

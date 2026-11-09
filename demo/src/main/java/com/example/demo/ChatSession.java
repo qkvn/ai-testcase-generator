@@ -26,6 +26,15 @@ public class ChatSession {
     @JsonManagedReference
     private List<TestCase> testCases;
 
+    // Nội dung User Story gốc (dùng cho phân tích truy vết yêu cầu)
+    @Column(name = "user_story", columnDefinition = "TEXT")
+    private String userStory;
+
+    // Các yêu cầu tách ra từ User Story; xóa phiên thì xóa luôn yêu cầu
+    @OneToMany(mappedBy = "chatSession", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Requirement> requirements;
+
     // Liên kết với bảng User (Nhiều ChatSession thuộc về 1 User)
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -44,6 +53,12 @@ public class ChatSession {
 
     public List<TestCase> getTestCases() { return testCases; }
     public void setTestCases(List<TestCase> testCases) { this.testCases = testCases; }
+
+    public String getUserStory() { return userStory; }
+    public void setUserStory(String userStory) { this.userStory = userStory; }
+
+    public List<Requirement> getRequirements() { return requirements; }
+    public void setRequirements(List<Requirement> requirements) { this.requirements = requirements; }
 
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }

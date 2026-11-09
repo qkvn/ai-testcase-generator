@@ -41,8 +41,8 @@ public class TestCaseController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Không tìm thấy người dùng");
         }
 
-        List<TestCase> testCases = testCaseService.generateAndSaveTestCases(userStory, lang, currentUser);
-        return ResponseEntity.ok(testCases);
+        GenerateResponse result = testCaseService.generateAndSaveTestCases(userStory, lang, currentUser);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/testcases")
@@ -89,5 +89,74 @@ public class TestCaseController {
     @PutMapping("/testcases/{id}")
     public ResponseEntity<?> updateTestCase(@PathVariable Long id, @RequestBody TestCase updatedTc) {
         return ResponseEntity.ok(testCaseService.updateTestCase(id, updatedTc));
+    }
+
+    // =====================================================================
+    // TRUY VẾT YÊU CẦU & ĐỘ BAO PHỦ
+    // =====================================================================
+
+    /** Ma trận truy vết + độ bao phủ (xem được cả ở chế độ chia sẻ). */
+    @GetMapping("/sessions/{id}/traceability")
+    public TraceabilityReport getTraceability(@PathVariable Long id) {
+        return testCaseService.getTraceability(id);
+    }
+
+    @GetMapping("/sessions/{id}/requirements")
+    public List<Requirement> getRequirements(@PathVariable Long id) {
+        return testCaseService.getRequirementsBySession(id);
+    }
+
+    /** AI phân tích lại yêu cầu và ánh xạ test case (dùng cho phiên cũ chưa có yêu cầu). */
+    @PostMapping("/sessions/{id}/traceability/analyze")
+    public ResponseEntity<?> analyzeTraceability(@PathVariable Long id,
+                                                 @RequestParam(defaultValue = "vi") String lang,
+                                                 @AuthenticationPrincipal OAuth2User principal) {
+        ResponseEntity<?> denied = checkOwner(id, principal);
+        if (denied != null) return denied;
+        return ResponseEntity.ok(testCaseService.analyzeTraceability(id, lang));
+    }
+
+    @PostMapping("/sessions/{id}/requirements")
+    public ResponseEntity<?> addRequirement(@PathVariable Long id, @RequestBody Requirement data,
+                                            @AuthenticationPrincipal OAuth2User principal) {
+        ResponseEntity<?> denied = checkOwner(id, principal);
+        if (denied != null) return denied;
+        return ResponseEntity.ok(testCaseService.addRequirement(id, data));
+    }
+
+    @PutMapping("/requirements/{id}")
+    public ResponseEntity<?> updateRequirement(@PathVariable Long id, @RequestBody Requirement data,
+                                               @AuthenticationPrincipal OAuth2User principal) {
+        ResponseEntity<?> denied = checkOwner(testCaseService.getSessionIdOfRequirement(id), principal);
+        if (denied != null) return denied;
+        return ResponseEntity.ok(testCaseService.updateRequirement(id, data));
+    }
+
+    @DeleteMapping("/requirements/{id}")
+    public ResponseEntity<?> deleteRequirement(@PathVariable Long id,
+                                               @AuthenticationPrincipal OAuth2User principal) {
+        ResponseEntity<?> denied = checkOwner(testCaseService.getSessionIdOfRequirement(id), principal);
+        if (denied != null) return denied;
+        testCaseService.deleteRequirement(id);
+        return ResponseEntity.ok().build();
+    }
+
+    /** Trả về lỗi nếu người dùng hiện tại không phải chủ phiên; null nếu hợp lệ. */
+    private ResponseEntity<?> checkOwner(Long sessionId, OAuth2User principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Vui lòng đăng nhập");
+        }
+        if (sessionId == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Không tìm thấy dữ liệu");
+        }
+        ChatSession session = chatSessionRepository.findById(sessionId).orElse(null);
+        if (session == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Không tìm thấy lịch sử");
+        }
+        String email = principal.getAttribute("email");
+        if (session.getUser() == null || email == null || !email.equals(session.getUser().getEmail())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Bạn không có quyền sửa phiên này");
+        }
+        return null;
     }
 }
