@@ -22,7 +22,10 @@ public class TestCaseController {
     private ChatSessionRepository chatSessionRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private CurrentUserService currentUserService;
+
+    @Autowired
+    private ActivityLogService activityLog;
 
     @PostMapping("/generate")
     public ResponseEntity<?> generateTestCase(
@@ -30,18 +33,14 @@ public class TestCaseController {
             @RequestParam(defaultValue = "vi") String lang,
             @AuthenticationPrincipal OAuth2User principal) {
 
-        if (principal == null) {
+        User currentUser = currentUserService.resolve(principal);
+        if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Vui lòng đăng nhập");
         }
 
-        String email = principal.getAttribute("email");
-        User currentUser = userRepository.findByEmail(email).orElse(null);
-
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Không tìm thấy người dùng");
-        }
-
         GenerateResponse result = testCaseService.generateAndSaveTestCases(userStory, lang, currentUser);
+        String title = userStory.length() > 80 ? userStory.substring(0, 80) + "..." : userStory;
+        activityLog.log(currentUser, "GENERATE", "Sinh " + result.testCases().size() + " test case: " + title);
         return ResponseEntity.ok(result);
     }
 
@@ -52,15 +51,9 @@ public class TestCaseController {
 
     @GetMapping("/sessions")
     public ResponseEntity<?> getAllSessions(@AuthenticationPrincipal OAuth2User principal) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Vui lòng đăng nhập");
-        }
-
-        String email = principal.getAttribute("email");
-        User currentUser = userRepository.findByEmail(email).orElse(null);
-
+        User currentUser = currentUserService.resolve(principal);
         if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Không tìm thấy người dùng");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Vui lòng đăng nhập");
         }
 
         List<ChatSession> mySessions = chatSessionRepository.findByUserOrderByIsPinnedDescIdDesc(currentUser);
@@ -171,8 +164,8 @@ public class TestCaseController {
         if (session == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Không tìm thấy lịch sử");
         }
-        String email = principal.getAttribute("email");
-        if (session.getUser() == null || email == null || !email.equals(session.getUser().getEmail())) {
+        User me = currentUserService.resolve(principal);
+        if (me == null || session.getUser() == null || !me.getId().equals(session.getUser().getId())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Bạn không có quyền sửa phiên này");
         }
         return null;

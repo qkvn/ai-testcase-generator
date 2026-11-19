@@ -47,6 +47,41 @@ public class DemoApplication {
         }
         addColumnIfMissing("chat_session", "user_story", "TEXT");
         addColumnIfMissing("test_cases", "requirement_ids", "TEXT");
+
+        // ===== Đăng nhập tài khoản / trang quản trị =====
+        addColumnIfMissing("users", "username", "VARCHAR(100)");
+        addColumnIfMissing("users", "password_hash", "VARCHAR(100)");
+        addColumnIfMissing("users", "role", "VARCHAR(20) DEFAULT 'USER'");
+        addColumnIfMissing("users", "locked", "BOOLEAN DEFAULT FALSE");
+        addColumnIfMissing("users", "created_at", "DATETIME(6)");
+        addColumnIfMissing("users", "last_login_at", "DATETIME(6)");
+        createTable("activity_logs", "CREATE TABLE IF NOT EXISTS activity_logs (" +
+                "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                "user_id BIGINT, " +
+                "username VARCHAR(150), " +
+                "action VARCHAR(50), " +
+                "detail TEXT, " +
+                "created_at DATETIME(6), " +
+                "INDEX idx_activity_logs_action (action)" +
+                ")");
+        createTable("password_reset_requests", "CREATE TABLE IF NOT EXISTS password_reset_requests (" +
+                "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                "identifier VARCHAR(150), " +
+                "note TEXT, " +
+                "user_id BIGINT, " +
+                "status VARCHAR(20), " +
+                "created_at DATETIME(6), " +
+                "handled_at DATETIME(6)" +
+                ")");
+    }
+
+    private void createTable(String name, String sql) {
+        try {
+            jdbcTemplate.execute(sql);
+            System.out.println("====== ĐÃ ÉP TẠO BẢNG " + name.toUpperCase() + " THÀNH CÔNG ======");
+        } catch (Exception e) {
+            System.out.println("====== LỖI KHI TẠO BẢNG " + name.toUpperCase() + ": " + e.getMessage() + " ======");
+        }
     }
 
     // MySQL 8 không hỗ trợ "ADD COLUMN IF NOT EXISTS" nên kiểm tra information_schema trước

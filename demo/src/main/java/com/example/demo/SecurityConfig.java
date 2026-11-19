@@ -6,6 +6,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.http.HttpStatus;
 import jakarta.servlet.DispatcherType;
@@ -31,6 +34,11 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
                         // BẮT BUỘC: Mở khóa các endpoint hệ thống và OAuth2
                         .requestMatchers("/", "/error", "/login**", "/oauth2/**", "/api/user/me").permitAll()
+                        // Đăng nhập / đăng ký / quên mật khẩu bằng tài khoản
+                        .requestMatchers("/api/auth/**").permitAll()
+                        // Trang admin (giao diện React) mở công khai; dữ liệu admin chỉ quyền ADMIN gọi được
+                        .requestMatchers("/admin", "/admin/").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // Mở file tĩnh của React để người chưa đăng nhập vẫn xem được trang chủ (landing page)
                         .requestMatchers("/index.html", "/assets/**", "/favicon.ico", "/*.svg", "/*.png", "/*.ico", "/*.ttf", "/*.json", "/*.txt").permitAll()
                         .anyRequest().authenticated()
@@ -47,6 +55,12 @@ public class SecurityConfig {
                         )
                         // Đăng nhập thành công: Dùng đường dẫn tương đối "/" để tự động nhận diện tên miền (localhost hoặc Render)
                         .defaultSuccessUrl("/", true)
+                        // Đăng nhập Google thất bại (VD: tài khoản bị khóa) -> về trang chủ kèm mã lỗi
+                        .failureHandler((request, response, exception) -> {
+                            String code = exception instanceof OAuth2AuthenticationException oe
+                                    && "account_locked".equals(oe.getError().getErrorCode()) ? "locked" : "google";
+                            response.sendRedirect("/?loginError=" + code);
+                        })
                 )
                 .logout(logout -> logout
                         .logoutUrl("/api/logout")
@@ -56,6 +70,12 @@ public class SecurityConfig {
                         .deleteCookies("JSESSIONID")
                 );
         return http.build();
+    }
+
+    /** Mã hóa mật khẩu một chiều bằng BCrypt. */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 
     @Bean

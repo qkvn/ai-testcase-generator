@@ -104,7 +104,8 @@ const translations = {
     editHint: "Click đúp vào ô để sửa",
     generatingTitle: "AI đang phân tích User Story...",
     generatingSub: "Quá trình này thường mất khoảng 5–15 giây.",
-    emptyHint: "Nhập User Story ở trên hoặc chọn một gợi ý để bắt đầu."
+    emptyHint: "Nhập User Story ở trên hoặc chọn một gợi ý để bắt đầu.",
+    adminPage: "Trang quản trị"
   },
   en: {
     title: "Automated Test Case Generator",
@@ -188,7 +189,8 @@ const translations = {
     editHint: "Double-click a cell to edit",
     generatingTitle: "AI is analyzing the user story...",
     generatingSub: "This usually takes about 5–15 seconds.",
-    emptyHint: "Enter a user story above or pick a suggestion to get started."
+    emptyHint: "Enter a user story above or pick a suggestion to get started.",
+    adminPage: "Admin dashboard"
   }
 };
 
@@ -197,7 +199,14 @@ function App() {
   const [testCases, setTestCases] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [language, setLanguage] = useState('vi');
+  // Ngôn ngữ được nhớ giữa các lần mở web và dùng chung với trang quản trị
+  const [language, setLanguageState] = useState(() => {
+    try { return localStorage.getItem('lang') === 'en' ? 'en' : 'vi'; } catch { return 'vi'; }
+  });
+  const setLanguage = (lang) => {
+    setLanguageState(lang);
+    try { localStorage.setItem('lang', lang); } catch { /* bỏ qua */ }
+  };
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window === 'undefined' || window.innerWidth > 768);
@@ -251,7 +260,28 @@ function App() {
     checkAuth();
   }, []);
 
-  const handleLogin = () => { window.location.href = API_BASE_URL + '/oauth2/authorization/google'; };
+  // Đăng nhập / đăng ký bằng tài khoản thành công -> tải lại trang (hoặc vào trang quản trị)
+  const handleLoggedIn = (user, opts) => {
+    if (opts?.admin) {
+      window.location.href = '/admin';
+    } else {
+      window.location.href = '/' + window.location.search;
+    }
+  };
+
+  // Báo "đang online" định kỳ; bị admin khóa / buộc đăng xuất thì quay về trang chủ
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    const timer = setInterval(async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        await axios.get(API_BASE_URL + '/api/user/me');
+      } catch (err) {
+        if (err.response?.status === 401) setCurrentUser(null);
+      }
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [currentUser]);
   const handleLogout = () => { window.location.href = API_BASE_URL + '/api/logout'; };
 
   const filteredHistory = chatSessions.filter(item =>
@@ -777,7 +807,7 @@ function App() {
 
   if (!currentUser) {
     // Trang chủ công khai: xem giới thiệu & test case nổi bật, mọi thao tác đều yêu cầu đăng nhập
-    return <LandingPage language={language} setLanguage={setLanguage} onLogin={handleLogin} />;
+    return <LandingPage language={language} setLanguage={setLanguage} onLoggedIn={handleLoggedIn} />;
   }
 
   const firstName = (currentUser.name || '').trim().split(/\s+/).pop() || '';
@@ -886,6 +916,9 @@ function App() {
               <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); setShowSettingsMenu(!showSettingsMenu); }} className="app-icon-btn app-icon-btn-light" title="Cài đặt">⚙️</button>
               {showSettingsMenu && (
                 <div className="app-menu" style={{ bottom: '64px', right: '12px', zIndex: 31 }}>
+                  {currentUser.role === 'ADMIN' && (
+                    <div onClick={(e) => { e.stopPropagation(); window.location.href = '/admin'; }} className="app-menu-item">🛡️ {t.adminPage}</div>
+                  )}
                   <div onClick={(e) => { e.stopPropagation(); handleLogout(); }} className="app-menu-item" style={{ color: '#dc3545', fontWeight: 600 }}>🚪 {t.logout}</div>
                 </div>
               )}

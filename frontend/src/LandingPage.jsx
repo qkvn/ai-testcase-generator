@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import LoginModal from './LoginModal';
+import { authText } from './authText';
 
 // Trang chủ hiển thị khi người dùng CHƯA đăng nhập.
 // Mọi thao tác sử dụng (khởi tạo, tìm kiếm, xem chi tiết đầy đủ) đều yêu cầu đăng nhập.
@@ -158,7 +160,6 @@ const priorityColors = {
   Low: { bg: '#e2e3e5', fg: '#41464b' },
 };
 
-const GOOGLE_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg';
 
 function Carousel({ group, L, onOpen }) {
   const ref = useRef(null);
@@ -194,14 +195,27 @@ function Carousel({ group, L, onOpen }) {
   );
 }
 
-export default function LandingPage({ language, setLanguage, onLogin }) {
+export default function LandingPage({ language, setLanguage, onLoggedIn }) {
   const L = text[language] || text.vi;
   const groups = featured[language] || featured.vi;
 
   const [story, setStory] = useState('');
   const [error, setError] = useState('');
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
+  // Bảng đăng nhập: null = đóng; { notice, error } = đang mở
+  const [authModal, setAuthModal] = useState(() => {
+    // Đăng nhập Google thất bại -> server chuyển về "/?loginError=locked|google"
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('loginError');
+      if (!code) return null;
+      params.delete('loginError');
+      const rest = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (rest ? '?' + rest : ''));
+      const errs = (authText[language] || authText.vi).errors;
+      return { error: code === 'locked' ? errs.locked : errs.google };
+    } catch { return null; }
+  });
+  const openLogin = (notice) => { setPreview(null); setAuthModal({ notice }); };
   const [preview, setPreview] = useState(null);
 
   const createRef = useRef(null);
@@ -211,10 +225,7 @@ export default function LandingPage({ language, setLanguage, onLogin }) {
 
   const goTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const requireLogin = () => {
-    setPreview(null);
-    setShowLoginModal(true);
-  };
+  const requireLogin = (hasDraft) => openLogin(hasDraft === true ? L.modalBody : L.modalBodyNoDraft);
 
   const handleCreate = () => {
     if (!story.trim()) {
@@ -224,8 +235,9 @@ export default function LandingPage({ language, setLanguage, onLogin }) {
     }
     setError('');
     // Giữ lại nội dung đã nhập để điền sẵn sau khi đăng nhập
-    try { sessionStorage.setItem(PENDING_STORY_KEY, story); setHasDraft(true); } catch { setHasDraft(false); }
-    requireLogin();
+    let saved = false;
+    try { sessionStorage.setItem(PENDING_STORY_KEY, story); saved = true; } catch { /* sessionStorage không khả dụng */ }
+    requireLogin(saved);
   };
 
   return (
@@ -252,7 +264,7 @@ export default function LandingPage({ language, setLanguage, onLogin }) {
             <option value="vi">VI</option>
             <option value="en">EN</option>
           </select>
-          <button className="lp-login" onClick={onLogin}>{L.login}</button>
+          <button className="lp-login" onClick={() => openLogin()}>{L.login}</button>
         </div>
       </nav>
 
@@ -354,10 +366,7 @@ export default function LandingPage({ language, setLanguage, onLogin }) {
         </div>
         <div className="lp-cta">
           <h3 style={{ margin: '0 0 16px 0', fontSize: '22px' }}>{L.ctaTitle}</h3>
-          <button className="lp-google" onClick={onLogin}>
-            <img src={GOOGLE_LOGO} alt="" style={{ width: '18px', height: '18px', backgroundColor: '#fff', padding: '3px', borderRadius: '50%' }} />
-            {L.ctaBtn}
-          </button>
+          <button className="lp-create" onClick={() => openLogin()}>{L.ctaBtn}</button>
         </div>
       </section>
 
@@ -386,20 +395,16 @@ export default function LandingPage({ language, setLanguage, onLogin }) {
         </div>
       )}
 
-      {/* ================= LOGIN REQUIRED MODAL ================= */}
-      {showLoginModal && (
-        <div className="lp-overlay" onClick={() => setShowLoginModal(false)}>
-          <div className="lp-modal" onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: '44px', marginBottom: '8px' }}>🔒</div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '21px' }}>{L.modalTitle}</h3>
-            <p style={{ color: '#6c757d', margin: '0 0 24px 0', lineHeight: 1.5 }}>{hasDraft ? L.modalBody : L.modalBodyNoDraft}</p>
-            <button className="lp-google" style={{ width: '100%', justifyContent: 'center' }} onClick={onLogin}>
-              <img src={GOOGLE_LOGO} alt="" style={{ width: '18px', height: '18px', backgroundColor: '#fff', padding: '3px', borderRadius: '50%' }} />
-              {L.modalGoogle}
-            </button>
-            <button onClick={() => setShowLoginModal(false)} style={{ marginTop: '10px', width: '100%', padding: '10px', background: 'none', border: 'none', color: '#6c757d', cursor: 'pointer', fontSize: '14px' }}>{L.modalLater}</button>
-          </div>
-        </div>
+      {/* ================= BẢNG ĐĂNG NHẬP ================= */}
+      {authModal && (
+        <LoginModal
+          language={language}
+          setLanguage={setLanguage}
+          notice={authModal.notice}
+          initialError={authModal.error}
+          onClose={() => setAuthModal(null)}
+          onLoggedIn={onLoggedIn}
+        />
       )}
     </div>
   );
