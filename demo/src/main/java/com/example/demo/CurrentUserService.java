@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * Xác định người dùng hiện tại cho cả 2 kiểu đăng nhập:
  *  - Đăng nhập tài khoản/mật khẩu: principal có thuộc tính "uid"
- *  - Đăng nhập Google: tìm theo email
+ *  - Đăng nhập Google: tìm tài khoản Google theo email
  * Tài khoản bị khóa / đã bị xóa -> trả về null (coi như chưa đăng nhập).
  */
 @Service
@@ -27,7 +27,7 @@ public class CurrentUserService {
             user = userRepository.findById(n.longValue());
         } else {
             String email = principal.getAttribute("email");
-            user = email == null ? Optional.empty() : userRepository.findByEmail(email);
+            user = email == null ? Optional.empty() : userRepository.findFirstByEmailAndProvider(email, "google");
         }
         return user.filter(u -> !u.isLockedSafe()).orElse(null);
     }

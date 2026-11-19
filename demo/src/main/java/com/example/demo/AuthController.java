@@ -44,7 +44,8 @@ public class AuthController {
     }
 
     public record LoginRequest(String username, String password, Boolean admin) {}
-    public record RegisterRequest(String username, String name, String email, String password) {}
+    // Đăng ký chỉ cần tên tài khoản + mật khẩu
+    public record RegisterRequest(String username, String password) {}
     public record ForgotRequest(String identifier, String note) {}
 
     static ResponseEntity<Map<String, Object>> error(HttpStatus status, String code, String message) {
@@ -67,7 +68,7 @@ public class AuthController {
 
         // Cho phép đăng nhập bằng tên tài khoản hoặc email
         Optional<User> found = userRepository.findByUsername(username);
-        if (found.isEmpty() && username.contains("@")) found = userRepository.findByEmail(username.toLowerCase(Locale.ROOT));
+        if (found.isEmpty() && username.contains("@")) found = userRepository.findFirstByEmailAndProvider(username.toLowerCase(Locale.ROOT), "local");
         User user = found.orElse(null);
 
         if (user == null || user.getPasswordHash() == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
@@ -93,17 +94,13 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest body, HttpServletRequest req, HttpServletResponse res) {
         String username = body.username() == null ? "" : body.username().trim();
-        String name = body.name() == null ? "" : body.name().trim();
-        String email = body.email() == null ? "" : body.email().trim().toLowerCase(Locale.ROOT);
         String password = body.password() == null ? "" : body.password();
 
-        ResponseEntity<Map<String, Object>> invalid = validateAccount(username, name, email, password, null);
+        ResponseEntity<Map<String, Object>> invalid = validateAccount(username, null, password, null);
         if (invalid != null) return invalid;
 
         User user = new User();
         user.setUsername(username);
-        user.setName(name);
-        user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setProvider("local");
         user.setRole("USER");
@@ -118,25 +115,33 @@ public class AuthController {
     }
 
     /**
-     * Kiểm tra dữ liệu tài khoản (dùng chung cho đăng ký và admin tạo / sửa tài khoản).
-     * password = null nghĩa là không kiểm tra mật khẩu; existingId = id tài khoản đang sửa.
+     * Kiểm tra dữ liệu tài khoản thường (dùng chung cho đăng ký và admin tạo / sửa tài khoản).
+     * email: không bắt buộc (null hoặc trống = bỏ qua); password = null: không kiểm tra mật khẩu;
+     * existingId = id tài khoản đang sửa.
      */
-    ResponseEntity<Map<String, Object>> validateAccount(String username, String name, String email, String password, Long existingId) {
-        if (!USERNAME.matcher(username).matches()) {
-            return error(HttpStatus.BAD_REQUEST, "bad_username", "Tên tài khoản dài 3–30 ký tự, chỉ gồm chữ, số và . _ -");
-        }
-        if (name.isEmpty()) return error(HttpStatus.BAD_REQUEST, "bad_name", "Vui lòng nhập họ tên");
-        if (!EMAIL.matcher(email).matches()) return error(HttpStatus.BAD_REQUEST, "bad_email", "Email không hợp lệ");
+    ResponseEntity<Map<String, Object>> validateAccount(String username, String email, String password, Long existingId) {
+        ResponseEntity<Map<String, Object>> invalid = validateUsername(username, existingId);
+        if (invalid != null) return invalid;
         if (password != null && password.length() < 6) {
             return error(HttpStatus.BAD_REQUEST, "bad_password", "Mật khẩu phải có ít nhất 6 ký tự");
+        }
+        if (email != null && !email.isEmpty()) {
+            if (!EMAIL.matcher(email).matches()) return error(HttpStatus.BAD_REQUEST, "bad_email", "Email không hợp lệ");
+            Optional<User> byEmail = userRepository.findFirstByEmailAndProvider(email, "local");
+            if (byEmail.isPresent() && !byEmail.get().getId().equals(existingId)) {
+                return error(HttpStatus.CONFLICT, "email_taken", "Email đã được sử dụng");
+            }
+        }
+        return null;
+    }
+
+    ResponseEntity<Map<String, Object>> validateUsername(String username, Long existingId) {
+        if (!USERNAME.matcher(username).matches()) {
+            return error(HttpStatus.BAD_REQUEST, "bad_username", "Tên tài khoản dài 3–30 ký tự, chỉ gồm chữ, số và . _ -");
         }
         Optional<User> byUsername = userRepository.findByUsername(username);
         if (byUsername.isPresent() && !byUsername.get().getId().equals(existingId)) {
             return error(HttpStatus.CONFLICT, "username_taken", "Tên tài khoản đã tồn tại");
-        }
-        Optional<User> byEmail = userRepository.findByEmail(email);
-        if (byEmail.isPresent() && !byEmail.get().getId().equals(existingId)) {
-            return error(HttpStatus.CONFLICT, "email_taken", "Email đã được sử dụng");
         }
         return null;
     }
@@ -147,7 +152,7 @@ public class AuthController {
         if (identifier.isEmpty()) return error(HttpStatus.BAD_REQUEST, "missing", "Vui lòng nhập tên tài khoản hoặc email");
 
         Optional<User> user = userRepository.findByUsername(identifier);
-        if (user.isEmpty() && identifier.contains("@")) user = userRepository.findByEmail(identifier.toLowerCase(Locale.ROOT));
+        if (user.isEmpty() && identifier.contains("@")) user = userRepository.findFirstByEmailAndProvider(identifier.toLowerCase(Locale.ROOT), "local");
 
         PasswordResetRequest r = new PasswordResetRequest();
         r.setIdentifier(identifier.length() > 150 ? identifier.substring(0, 150) : identifier);

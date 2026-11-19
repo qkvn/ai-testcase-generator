@@ -28,7 +28,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         String picture = oAuth2User.getAttribute("picture");
         String providerId = oAuth2User.getAttribute("sub");
 
-        User user = userRepository.findByEmail(email).orElse(null);
+        // Chỉ tìm trong tài khoản Google (tách biệt với tài khoản đăng ký bằng tên tài khoản)
+        User user = userRepository.findFirstByEmailAndProvider(email, "google").orElse(null);
         boolean isNew = user == null;
         if (isNew) {
             user = new User();

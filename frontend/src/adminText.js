@@ -53,7 +53,7 @@ export const adminText = {
     noUsers: 'Không tìm thấy tài khoản nào.',
     // Form tài khoản
     editTitle: 'Sửa tài khoản', createTitle: 'Tạo tài khoản mới',
-    fUsername: 'Tên tài khoản', fName: 'Họ và tên', fEmail: 'Email', fRole: 'Quyền', fLocked: 'Khóa tài khoản này', fPassword: 'Mật khẩu',
+    fUsername: 'Tên tài khoản', fName: 'Họ và tên (không bắt buộc)', fEmail: 'Email (không bắt buộc)', fRole: 'Quyền', fLocked: 'Khóa tài khoản này', fPassword: 'Mật khẩu',
     save: 'Lưu', cancel: 'Hủy', create: 'Tạo', saved: 'Đã lưu thay đổi', created: 'Đã tạo tài khoản',
     googleNote: 'Tài khoản Google: người dùng đăng nhập bằng Google. Bạn có thể đặt tên tài khoản để họ đăng nhập thêm bằng mật khẩu.',
     // Đặt lại mật khẩu
@@ -143,7 +143,7 @@ export const adminText = {
     usersCount: (n) => `${n} accounts`,
     noUsers: 'No accounts found.',
     editTitle: 'Edit account', createTitle: 'New account',
-    fUsername: 'Username', fName: 'Full name', fEmail: 'Email', fRole: 'Role', fLocked: 'Lock this account', fPassword: 'Password',
+    fUsername: 'Username', fName: 'Full name (optional)', fEmail: 'Email (optional)', fRole: 'Role', fLocked: 'Lock this account', fPassword: 'Password',
     save: 'Save', cancel: 'Cancel', create: 'Create', saved: 'Changes saved', created: 'Account created',
     googleNote: 'Google account: the user signs in with Google. You can set a username so they can also sign in with a password.',
     resetTitle: 'Reset password',

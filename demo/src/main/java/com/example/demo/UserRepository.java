@@ -7,7 +7,8 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
-    Optional<User> findByEmail(String email);
+    // Tài khoản Google và tài khoản thường tách biệt: luôn tìm email kèm loại tài khoản
+    Optional<User> findFirstByEmailAndProvider(String email, String provider);
     Optional<User> findByUsername(String username);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);

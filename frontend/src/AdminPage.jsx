@@ -319,7 +319,8 @@ function UserFormModal({ T, user, onClose, onSaved, notify }) {
         <label className="ad-label">{T.fName}</label>
         <input className="ad-input" value={form.name} onChange={set('name')} />
         <label className="ad-label">{T.fEmail}</label>
-        <input className="ad-input" type="email" value={form.email} onChange={set('email')} />
+        <input className="ad-input" type="email" value={form.email} onChange={set('email')}
+          disabled={!isNew && user.provider === 'google'} title={!isNew && user.provider === 'google' ? 'Google' : ''} />
         {isNew && (
           <>
             <label className="ad-label">{T.fPassword}</label>

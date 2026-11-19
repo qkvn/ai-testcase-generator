@@ -42,8 +42,6 @@ export default function LoginModal({ language, setLanguage, initialView = 'login
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [confirm, setConfirm] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [note, setNote] = useState('');
@@ -66,11 +64,11 @@ export default function LoginModal({ language, setLanguage, initialView = 'login
 
   const submitRegister = async (e) => {
     e.preventDefault();
-    if (!username.trim() || !name.trim() || !email.trim() || !password) { setError(L.errors.missing); return; }
+    if (!username.trim() || !password) { setError(L.errors.missing); return; }
     if (password !== confirm) { setError(L.errors.mismatch); return; }
     setBusy(true); setError('');
     try {
-      const res = await api.post('/api/auth/register', { username: username.trim(), name: name.trim(), email: email.trim(), password });
+      const res = await api.post('/api/auth/register', { username: username.trim(), password });
       onLoggedIn?.(res.data, { admin: false });
     } catch (err) {
       setError(authErrorMessage(err, L));
@@ -151,10 +149,6 @@ export default function LoginModal({ language, setLanguage, initialView = 'login
           <form onSubmit={submitRegister}>
             <label className="lm-label">{L.username}</label>
             <input className="lm-input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="vd: khanh_qa" autoComplete="username" autoFocus />
-            <label className="lm-label">{L.fullName}</label>
-            <input className="lm-input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
-            <label className="lm-label">{L.email}</label>
-            <input className="lm-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             <label className="lm-label">{L.password}</label>
             <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" L={L} autoComplete="new-password" />
             <label className="lm-label">{L.confirmPassword}</label>

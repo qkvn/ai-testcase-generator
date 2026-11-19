@@ -86,13 +86,13 @@ public class AdminController {
         String name = trim(form.name());
         String email = trim(form.email()).toLowerCase(Locale.ROOT);
         String password = form.password() == null ? "" : form.password();
-        ResponseEntity<Map<String, Object>> invalid = authController.validateAccount(username, name, email, password, null);
+        ResponseEntity<Map<String, Object>> invalid = authController.validateAccount(username, email, password, null);
         if (invalid != null) return invalid;
 
         User u = new User();
         u.setUsername(username);
-        u.setName(name);
-        u.setEmail(email);
+        u.setName(name.isEmpty() ? null : name);
+        u.setEmail(email.isEmpty() ? null : email);
         u.setPasswordHash(passwordEncoder.encode(password));
         u.setProvider("local");
         u.setRole("ADMIN".equals(form.role()) ? "ADMIN" : "USER");
@@ -113,7 +113,9 @@ public class AdminController {
         String username = trim(form.username());
         String name = trim(form.name());
         String email = trim(form.email()).toLowerCase(Locale.ROOT);
-        ResponseEntity<Map<String, Object>> invalid = authController.validateAccount(username, name, email, null, u.getId());
+        ResponseEntity<Map<String, Object>> invalid = "google".equals(u.getProvider())
+                ? authController.validateUsername(username, u.getId())   // email tài khoản Google lấy từ Google, không sửa
+                : authController.validateAccount(username, email, null, u.getId());
         if (invalid != null) return invalid;
 
         String newRole = "ADMIN".equals(form.role()) ? "ADMIN" : "USER";
@@ -128,8 +130,8 @@ public class AdminController {
 
         boolean lockedNow = newLocked && !u.isLockedSafe();
         u.setUsername(username);
-        u.setName(name);
-        u.setEmail(email);
+        u.setName(name.isEmpty() ? null : name);
+        if (!"google".equals(u.getProvider())) u.setEmail(email.isEmpty() ? null : email);
         u.setRole(newRole);
         u.setLocked(newLocked);
         userRepository.save(u);
@@ -281,7 +283,7 @@ public class AdminController {
         String id = r.getIdentifier() == null ? "" : r.getIdentifier().trim();
         if (id.isEmpty()) return null;
         Optional<User> u = userRepository.findByUsername(id);
-        if (u.isEmpty() && id.contains("@")) u = userRepository.findByEmail(id.toLowerCase(Locale.ROOT));
+        if (u.isEmpty() && id.contains("@")) u = userRepository.findFirstByEmailAndProvider(id.toLowerCase(Locale.ROOT), "local");
         return u.orElse(null);
     }
 
