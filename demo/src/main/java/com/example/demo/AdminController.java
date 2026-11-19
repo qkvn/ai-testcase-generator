@@ -129,13 +129,17 @@ public class AdminController {
         }
 
         boolean lockedNow = newLocked && !u.isLockedSafe();
+        boolean roleChanged = !newRole.equals(u.getRole() == null ? "USER" : u.getRole());
         u.setUsername(username);
         u.setName(name.isEmpty() ? null : name);
         if (!"google".equals(u.getProvider())) u.setEmail(email.isEmpty() ? null : email);
         u.setRole(newRole);
         u.setLocked(newLocked);
         userRepository.save(u);
-        if (lockedNow) adminService.forceLogout(u); // khóa thì đá ra khỏi hệ thống ngay
+        // Khóa tài khoản hoặc đổi quyền -> đăng xuất người đó ngay để thay đổi có hiệu lực
+        // (được cấp quyền quản trị: đăng nhập lại là vào được trang admin; bị gỡ quyền: mất quyền ngay)
+        if (lockedNow || roleChanged) adminService.forceLogout(u);
+        currentUserService.evict(u.getId());
         activityLog.log(me, "ADMIN_UPDATE_USER", "Cập nhật tài khoản: " + username
                 + (lockedNow ? " (khóa)" : "") + " | quyền: " + newRole);
         return ResponseEntity.ok(AdminService.userSummary(u));
@@ -154,6 +158,7 @@ public class AdminController {
         u.setLocked(lock);
         userRepository.save(u);
         if (lock) adminService.forceLogout(u);
+        currentUserService.evict(u.getId());
         activityLog.log(me, lock ? "ADMIN_LOCK_USER" : "ADMIN_UNLOCK_USER",
                 (lock ? "Khóa tài khoản: " : "Mở khóa tài khoản: ") + ActivityLogService.displayName(u));
         return ResponseEntity.ok(AdminService.userSummary(u));
@@ -173,6 +178,7 @@ public class AdminController {
                 ? adminService.randomPassword() : form.newPassword();
         if (pw.length() < 6) return error(HttpStatus.BAD_REQUEST, "bad_password", "Mật khẩu phải có ít nhất 6 ký tự");
         adminService.setPassword(u, pw);
+        currentUserService.evict(u.getId());
         activityLog.log(admin(principal), "ADMIN_RESET_PASSWORD", "Đặt lại mật khẩu: " + u.getUsername());
         return ResponseEntity.ok(Map.of("username", u.getUsername(), "password", pw));
     }
@@ -190,6 +196,7 @@ public class AdminController {
         }
         String label = ActivityLogService.displayName(u);
         adminService.deleteUser(u);
+        currentUserService.evict(id);
         activityLog.log(me, "ADMIN_DELETE_USER", "Xóa tài khoản: " + label);
         return ResponseEntity.ok(Map.of("deleted", id));
     }
@@ -274,6 +281,7 @@ public class AdminController {
             return error(HttpStatus.BAD_REQUEST, "bad_password", "Mật khẩu mới của admin phải có ít nhất 8 ký tự");
         }
         adminService.setPassword(me, form.newPassword());
+        currentUserService.evict(me.getId());
         activityLog.log(me, "ADMIN_CHANGE_PASSWORD", "Admin đổi mật khẩu");
         return ResponseEntity.ok(Map.of("message", "ok"));
     }

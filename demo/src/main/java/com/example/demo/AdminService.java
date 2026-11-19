@@ -1,6 +1,7 @@
 package com.example.demo;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +46,7 @@ public class AdminService {
         try {
             jdbc.query("SELECT PRINCIPAL_NAME, MAX(LAST_ACCESS_TIME) AS LAST_ACCESS, COUNT(*) AS CNT FROM SPRING_SESSION "
                             + "WHERE PRINCIPAL_NAME IS NOT NULL AND LAST_ACCESS_TIME > ? GROUP BY PRINCIPAL_NAME",
-                    rs -> { result.put(rs.getString("PRINCIPAL_NAME"), new long[]{rs.getLong("LAST_ACCESS"), rs.getLong("CNT")}); },
+                    (RowCallbackHandler) rs -> { result.put(rs.getString("PRINCIPAL_NAME"), new long[]{rs.getLong("LAST_ACCESS"), rs.getLong("CNT")}); },
                     since);
         } catch (Exception ignored) {
             // Bảng session chưa tồn tại (VD: chạy test) -> coi như không có ai online
@@ -64,24 +65,40 @@ public class AdminService {
         return names;
     }
 
+    /** Thời điểm hoạt động cuối của tài khoản trong 5 phút gần nhất (0 = không hoạt động). */
+    private static long lastActive(User u, Map<String, long[]> online) {
+        long last = 0;
+        for (String name : principalNames(u)) {
+            long[] v = online.get(name);
+            if (v != null) last = Math.max(last, v[0]);
+        }
+        return last;
+    }
+
+    /**
+     * Danh sách cho mục "Đang online": mọi người đang hoạt động + TẤT CẢ quản trị viên
+     * (kể cả người vừa được cấp quyền mà chưa online) kèm trạng thái hoạt động / không hoạt động.
+     */
     public List<Map<String, Object>> onlineUsers() {
         Map<String, long[]> online = onlinePrincipals();
         List<Map<String, Object>> list = new ArrayList<>();
-        if (online.isEmpty()) return list;
         for (User u : userRepository.findAll()) {
-            long last = 0, count = 0;
-            for (String name : principalNames(u)) {
-                long[] v = online.get(name);
-                if (v != null) { last = Math.max(last, v[0]); count += v[1]; }
-            }
-            if (count > 0) {
-                Map<String, Object> row = userSummary(u);
-                row.put("lastAccess", last);
-                row.put("sessions", count);
-                list.add(row);
-            }
+            long last = lastActive(u, online);
+            if (last == 0 && !u.isAdmin()) continue;
+            Map<String, Object> row = userSummary(u);
+            row.put("online", last > 0);
+            row.put("lastAccess", last > 0 ? last : null);
+            list.add(row);
         }
-        list.sort((a, b) -> Long.compare((long) b.get("lastAccess"), (long) a.get("lastAccess")));
+        // Đang hoạt động lên trước, rồi tới quản trị viên, mới hoạt động gần nhất lên đầu
+        list.sort((a, b) -> {
+            int c = Boolean.compare((boolean) b.get("online"), (boolean) a.get("online"));
+            if (c != 0) return c;
+            Long la = (Long) a.get("lastAccess"), lb = (Long) b.get("lastAccess");
+            if (la == null) la = (Long) a.get("lastLoginAt");
+            if (lb == null) lb = (Long) b.get("lastLoginAt");
+            return Long.compare(lb == null ? 0 : lb, la == null ? 0 : la);
+        });
         return list;
     }
 
@@ -115,11 +132,19 @@ public class AdminService {
         s.put("lockedUsers", locked);
         s.put("newToday", newToday);
         s.put("new7Days", new7);
-        s.put("onlineNow", onlineUsers().size());
-        s.put("totalSessions", count("SELECT COUNT(*) FROM chat_session"));
-        s.put("totalTestCases", count("SELECT COUNT(*) FROM test_cases"));
-        s.put("totalRequirements", count("SELECT COUNT(*) FROM requirements"));
-        s.put("pendingResetRequests", resetRepository.countByStatus("PENDING"));
+        Map<String, long[]> online = onlinePrincipals();
+        s.put("onlineNow", users.stream().filter(u -> lastActive(u, online) > 0).count());
+        // Gộp các phép đếm vào 1 câu SQL (database ở xa -> mỗi câu truy vấn đều tốn thời gian)
+        long[] totals = {0, 0, 0, 0};
+        try {
+            jdbc.query("SELECT (SELECT COUNT(*) FROM chat_session), (SELECT COUNT(*) FROM test_cases), "
+                    + "(SELECT COUNT(*) FROM requirements), (SELECT COUNT(*) FROM password_reset_requests WHERE status = 'PENDING')",
+                    (RowCallbackHandler) rs -> { for (int i = 0; i < 4; i++) totals[i] = rs.getLong(i + 1); });
+        } catch (Exception ignored) { }
+        s.put("totalSessions", totals[0]);
+        s.put("totalTestCases", totals[1]);
+        s.put("totalRequirements", totals[2]);
+        s.put("pendingResetRequests", totals[3]);
 
         // Lượt sinh test case (số phiên được tạo) theo ngày trong 14 ngày gần nhất
         LocalDate from = LocalDate.now().minusDays(13);
@@ -127,7 +152,7 @@ public class AdminService {
         for (int i = 0; i < 14; i++) perDay.put(from.plusDays(i), 0L);
         try {
             jdbc.query("SELECT DATE(created_at) AS d, COUNT(*) AS c FROM chat_session WHERE created_at >= ? GROUP BY DATE(created_at)",
-                    rs -> {
+                    (RowCallbackHandler) rs -> {
                         java.sql.Date d = rs.getDate("d");
                         if (d != null) perDay.put(d.toLocalDate(), rs.getLong("c"));
                     }, Timestamp.valueOf(from.atStartOfDay()));
@@ -166,7 +191,7 @@ public class AdminService {
     private Map<Long, Long> countByUser(String sql) {
         Map<Long, Long> m = new HashMap<>();
         try {
-            jdbc.query(sql, rs -> {
+            jdbc.query(sql, (RowCallbackHandler) rs -> {
                 long id = rs.getLong(1);
                 if (!rs.wasNull()) m.put(id, rs.getLong(2));
             });

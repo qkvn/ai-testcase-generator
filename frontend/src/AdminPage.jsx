@@ -156,7 +156,7 @@ function Overview({ T, language, stats }) {
 }
 
 // ---------------- Đang online ----------------
-function OnlineUsers({ T, me, notify, refreshKey, onChanged }) {
+function OnlineUsers({ T, language, me, notify, refreshKey, onChanged }) {
   const [rows, setRows] = useState(null);
   const [, setTick] = useState(0);
 
@@ -169,7 +169,7 @@ function OnlineUsers({ T, me, notify, refreshKey, onChanged }) {
 
   useEffect(() => {
     defer(load);
-    const timer = setInterval(() => { load(); setTick(t => t + 1); }, 15000);
+    const timer = setInterval(() => { load(); setTick(t => t + 1); }, 30000);
     return () => clearInterval(timer);
   }, [load, refreshKey]);
 
@@ -188,17 +188,30 @@ function OnlineUsers({ T, me, notify, refreshKey, onChanged }) {
       {rows === null ? <div className="ad-empty">{T.loading}</div> : rows.length === 0 ? <div className="ad-empty">🌙 {T.nobodyOnline}</div> : (
         <div className="ad-table-wrap">
           <table className="ad-table">
-            <thead><tr><th>{T.col.account}</th><th>{T.col.email}</th><th>{T.col.type}</th><th>{T.lastActive}</th><th>{T.tabsCount}</th><th></th></tr></thead>
+            <thead><tr><th>{T.col.account}</th><th>{T.col.type}</th><th>{T.col.role}</th><th>{T.col.status}</th><th>{T.lastActive}</th><th></th></tr></thead>
             <tbody>
               {rows.map(u => (
-                <tr key={u.id}>
-                  <td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span className="ad-dot ad-pulse" style={{ background: '#22c55e' }} /><UserCell user={u} T={T} me={me} /></div></td>
-                  <td>{u.email || '—'}</td>
+                <tr key={u.id} className={u.online ? '' : 'ad-row-offline'}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className={'ad-dot' + (u.online ? ' ad-pulse' : '')} style={{ background: u.online ? '#22c55e' : '#cbd5e1' }} />
+                      <UserCell user={u} T={T} me={me} showEmail />
+                    </div>
+                  </td>
                   <td><TypeBadge u={u} T={T} /></td>
-                  <td>{ago(u.lastAccess, T)}</td>
-                  <td>{u.sessions}</td>
+                  <td>{u.role === 'ADMIN' ? <span className="ad-badge ad-badge-purple">🛡️ {T.roleAdmin}</span> : <span className="ad-muted">{T.roleUser}</span>}</td>
+                  <td>
+                    {u.online
+                      ? <span className="ad-badge ad-badge-green">● {T.presenceOn}</span>
+                      : <span className="ad-badge ad-badge-gray">○ {T.presenceOff}</span>}
+                  </td>
+                  <td className="ad-nowrap">
+                    {u.online ? ago(u.lastAccess, T)
+                      : u.lastLoginAt ? <span className="ad-muted">{T.lastSignIn}: {fmtTime(u.lastLoginAt, language)}</span>
+                        : <span className="ad-muted">—</span>}
+                  </td>
                   <td style={{ textAlign: 'right' }}>
-                    {me?.id !== u.id && <button className="ad-btn ad-btn-danger-soft" onClick={() => kick(u)}>⏏ {T.forceLogout}</button>}
+                    {u.online && me?.id !== u.id && <button className="ad-btn ad-btn-danger-soft" onClick={() => kick(u)}>⏏ {T.forceLogout}</button>}
                   </td>
                 </tr>
               ))}
@@ -672,7 +685,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!isAdmin) return undefined;
     defer(loadStats);
-    const timer = setInterval(loadStats, 30000);
+    const timer = setInterval(loadStats, 60000);
     return () => clearInterval(timer);
   }, [isAdmin, loadStats, refreshKey]);
 
@@ -755,7 +768,7 @@ export default function AdminPage() {
 
         <div className="ad-content">
           {tab === 'overview' && <Overview T={T} language={language} stats={stats} />}
-          {tab === 'online' && <OnlineUsers T={T} me={me} notify={notify} refreshKey={refreshKey} onChanged={onChanged} />}
+          {tab === 'online' && <OnlineUsers T={T} language={language} me={me} notify={notify} refreshKey={refreshKey} onChanged={onChanged} />}
           {tab === 'users' && <Users T={T} language={language} me={me} notify={notify} refreshKey={refreshKey} onChanged={onChanged} />}
           {tab === 'logs' && <Logs T={T} language={language} notify={notify} refreshKey={refreshKey} />}
           {tab === 'resets' && <ResetRequests T={T} language={language} notify={notify} refreshKey={refreshKey} onChanged={onChanged} />}
@@ -836,6 +849,7 @@ const adCss = `
 .ad-table tr:last-child td { border-bottom: none; }
 .ad-table tbody tr:hover { background: #fafbfd; }
 .ad-row-locked td { opacity: .65; }
+.ad-row-offline td { color: #64748b; }
 .ad-nowrap { white-space: nowrap; }
 .ad-sticky { position: sticky; right: 0; background: #fff; box-shadow: -8px 0 10px -8px rgba(15,23,42,0.12); }
 .ad-table th.ad-sticky { background: #fafbfd; }
