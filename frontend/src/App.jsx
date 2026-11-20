@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import TraceabilityPanel from './TraceabilityPanel';
 import LandingPage from './LandingPage';
+import SrsPanel from './SrsPanel';
+import { srsText, ACCEPTED_SRS, MAX_SRS_BYTES } from './srsText';
 import { computeCoverage, parseRequirementIds } from './traceability';
 
 axios.defaults.withCredentials = true;
@@ -209,6 +211,15 @@ function App() {
   };
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+
+  // Tải tài liệu SRS
+  const [srsDoc, setSrsDoc] = useState(null);       // tài liệu đã đọc (đang chọn phần)
+  const [srsParsing, setSrsParsing] = useState(false);
+  const [srsRun, setSrsRun] = useState(null);       // tiến độ sinh test case từ SRS
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef(null);
+  const srsStopRef = useRef(false);
+  const srsSessionRef = useRef(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window === 'undefined' || window.innerWidth > 768);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -314,6 +325,9 @@ function App() {
   }, [currentUser]);
 
   const handleNewChat = () => {
+    srsStopRef.current = true;
+    setSrsDoc(null);
+    setSrsRun(null);
     setActiveSessionId(null);
     setCurrentSessionId(null);
     setTestCases([]);
@@ -379,9 +393,106 @@ function App() {
     fetchTestCasesOnly(sessionId);
   };
 
-  const handleFakeUpload = () => {
+  // ================== TẢI TÀI LIỆU SRS ==================
+  const srsT = srsText[language] || srsText.vi;
+
+  const srsErrorMessage = (err) => {
+    const code = err?.response?.data?.code;
+    if (code && srsT.errors[code]) return srsT.errors[code];
+    if (!err?.response) return srsT.errors.network;
+    return err.response.data?.message || err.message;
+  };
+
+  const handleSrsFile = async (file) => {
     setShowPlusMenu(false);
-    alert("Tính năng phân tích hình ảnh đang được phát triển. Sẽ ra mắt trong các phiên bản cập nhật tiếp theo!");
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.doc')) { setError('⚠️ ' + srsT.errors.doc_old); return; }
+    if (!ACCEPTED_SRS.some(ext => name.endsWith(ext))) { setError('⚠️ ' + srsT.errors.bad_format); return; }
+    if (file.size > MAX_SRS_BYTES) { setError('⚠️ ' + srsT.errors.too_large); return; }
+    setError('');
+    setSrsParsing(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await axios.post(API_BASE_URL + '/api/srs/parse', form);
+      setSrsRun(null);
+      srsSessionRef.current = null;
+      setSrsDoc(res.data);
+    } catch (err) {
+      setError('⚠️ ' + srsErrorMessage(err));
+    } finally {
+      setSrsParsing(false);
+    }
+  };
+
+  /** Sinh test case lần lượt cho từng phần; phần đầu tạo phiên, các phần sau thêm vào cùng phiên. */
+  const handleSrsGenerate = async (sections, isRetry = false) => {
+    if (!srsDoc || sections.length === 0) return;
+    srsStopRef.current = false;
+    if (!isRetry) {
+      srsSessionRef.current = null;
+      setTestCases([]);
+      setRequirements([]);
+      setCurrentSessionId(null);
+      setActiveTab('testcases');
+    }
+    setHasUnsavedChanges(false);
+    const sourceText = sections.map(s => `## ${s.title}\n\n${s.content}`).join('\n\n');
+    const failed = [];
+    let tcCount = isRetry ? (srsRun?.tcCount || 0) : 0;
+    let stopped = false;
+    setSrsRun({ total: sections.length, current: 1, title: sections[0].title, tcCount, failed: [], done: false, sessionId: srsSessionRef.current });
+
+    for (let i = 0; i < sections.length; i++) {
+      if (srsStopRef.current) { stopped = true; break; }
+      const sec = sections[i];
+      setSrsRun(r => ({ ...r, current: i + 1, title: sec.title }));
+      try {
+        const res = await axios.post(API_BASE_URL + '/api/srs/generate', {
+          sessionId: srsSessionRef.current,
+          fileName: srsDoc.fileName,
+          sectionTitle: sec.title,
+          content: sec.content,
+          sourceText: srsSessionRef.current ? null : sourceText,
+          lang: language,
+        });
+        if (srsStopRef.current && !srsSessionRef.current && !res.data.sessionId) break;
+        srsSessionRef.current = res.data.sessionId;
+        latestRequestedSession.current = res.data.sessionId;
+        setCurrentSessionId(res.data.sessionId);
+        setTestCases(prev => [...prev, ...(res.data.testCases || [])]);
+        setRequirements(prev => [...prev, ...(res.data.requirements || [])]);
+        tcCount += (res.data.testCases || []).length;
+        setSrsRun(r => ({ ...r, tcCount, sessionId: res.data.sessionId }));
+      } catch (err) {
+        failed.push({ ...sec, error: srsErrorMessage(err) });
+      }
+    }
+
+    setSrsRun(r => ({ ...r, done: true, stopped, failed, tcCount }));
+    fetchSessions();
+    // Thành công hết -> mở luôn phiên vừa tạo
+    if (!stopped && failed.length === 0 && srsSessionRef.current) {
+      const id = srsSessionRef.current;
+      setSrsDoc(null);
+      setSrsRun(null);
+      fetchTestCasesOnly(id);
+    }
+  };
+
+  const handleSrsViewResult = () => {
+    const id = srsSessionRef.current;
+    setSrsDoc(null);
+    setSrsRun(null);
+    if (id) fetchTestCasesOnly(id);
+  };
+
+  const handleComposerDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleSrsFile(file);
   };
 
   const handleGenerate = async () => {
@@ -949,7 +1060,28 @@ function App() {
             <section className="app-hero">
               <h1 className="app-hero-title">{t.heroHello}{firstName ? ', ' : ''}<span className="app-grad">{firstName}</span> 👋</h1>
               <p style={{ margin: '0 auto 24px', fontSize: '15px', lineHeight: 1.6, maxWidth: '600px' }}>{t.heroSub}</p>
-              <div className="app-composer">
+              <input ref={fileInputRef} type="file" accept={ACCEPTED_SRS.join(',')} style={{ display: 'none' }}
+                onChange={(e) => { handleSrsFile(e.target.files?.[0]); e.target.value = ''; }} />
+              {srsDoc ? (
+                <SrsPanel
+                  key={srsDoc.fileName + srsDoc.chars}
+                  language={language}
+                  doc={srsDoc}
+                  run={srsRun}
+                  onClose={() => { srsStopRef.current = true; setSrsDoc(null); setSrsRun(null); }}
+                  onGenerate={(sections) => handleSrsGenerate(sections)}
+                  onStop={() => { srsStopRef.current = true; setSrsRun(r => ({ ...r, stopping: true })); }}
+                  onRetry={(sections) => handleSrsGenerate(sections, true)}
+                  onViewResult={handleSrsViewResult}
+                />
+              ) : (
+              <>
+              <div className={'app-composer' + (dragOver ? ' app-drag' : '')}
+                onDragOver={(e) => { e.preventDefault(); if (!dragOver) setDragOver(true); }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
+                onDrop={handleComposerDrop}>
+                {dragOver && <div className="app-drop-hint">📄 {srsT.dropNow}</div>}
+                {srsParsing && <div className="app-drop-hint"><span className="app-spinner app-spinner-sm" style={{ borderColor: '#dbe4ff', borderTopColor: '#1f4fd8' }} /> {srsT.parsing}</div>}
                 <textarea rows={3} placeholder={t.placeholder} value={userStory} onChange={(e) => setUserStory(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !loading) handleGenerate(); }} />
                 <div className="app-composer-bar">
@@ -957,10 +1089,10 @@ function App() {
                     <button onClick={() => setShowPlusMenu(!showPlusMenu)} className="app-plus">+</button>
                     {showPlusMenu && (
                       <div className="app-menu" style={{ bottom: '46px', left: 0, top: 'auto' }}>
-                        <div onClick={handleFakeUpload} className="app-menu-item">📁 Tải tệp lên...</div>
+                        <div onClick={() => { setShowPlusMenu(false); fileInputRef.current?.click(); }} className="app-menu-item">{srsT.menuUpload}</div>
                       </div>
                     )}
-                    <span className="app-hint">Ctrl + Enter</span>
+                    <span className="app-hint">Ctrl + Enter · {srsT.dropHint}</span>
                   </div>
                   <button onClick={handleGenerate} disabled={loading} className="app-btn app-btn-orange app-btn-lg">
                     {loading ? <><span className="app-spinner app-spinner-sm" /> {t.btnLoading}</> : '✨ ' + t.btnGenerate}
@@ -971,7 +1103,10 @@ function App() {
                 {t.suggestions.map((s, i) => (
                   <button key={i} className="app-chip" onClick={() => setUserStory(s.text)}>{s.label}</button>
                 ))}
+                <button className="app-chip" onClick={() => fileInputRef.current?.click()} disabled={srsParsing}>📄 SRS (.docx, .pdf, .txt, .md)</button>
               </div>
+              </>
+              )}
               {error && <div className="app-error">{error}</div>}
             </section>
           )}
@@ -1140,6 +1275,9 @@ const appCss = `
 .app-hero p { color: var(--muted) !important; opacity: 1 !important; }
 .app-composer { background: #fff; border-radius: 18px; padding: 14px 14px 12px; border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(15,23,42,0.06); text-align: left; transition: border-color .15s, box-shadow .15s; }
 .app-composer:focus-within { border-color: #b9c8f5; box-shadow: 0 10px 30px rgba(31,79,216,0.10); }
+.app-composer { position: relative; }
+.app-composer.app-drag { border: 2px dashed #1f4fd8; background: #f8faff; }
+.app-drop-hint { position: absolute; inset: 0; border-radius: 18px; background: rgba(248,250,255,0.94); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; color: #1f4fd8; z-index: 2; pointer-events: none; }
 .app-composer textarea { width: 100%; border: none; outline: none; resize: none; font-size: 15px; line-height: 1.55; font-family: inherit; color: var(--ink); box-sizing: border-box; background: transparent; }
 .app-composer textarea::placeholder { color: #94a3b8; }
 .app-composer-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 6px; padding-top: 8px; flex-wrap: wrap; }

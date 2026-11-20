@@ -27,7 +27,7 @@ public class ChatSession {
     private List<TestCase> testCases;
 
     // Nội dung User Story gốc (dùng cho phân tích truy vết yêu cầu)
-    @Column(name = "user_story", columnDefinition = "TEXT")
+    @Column(name = "user_story", columnDefinition = "MEDIUMTEXT") // tài liệu SRS có thể rất dài
     private String userStory;
 
     // Các yêu cầu tách ra từ User Story; xóa phiên thì xóa luôn yêu cầu

@@ -71,7 +71,7 @@ export const adminText = {
     colTime: 'Thời gian', colUser: 'Người thực hiện', colAction: 'Hoạt động', colDetail: 'Chi tiết',
     actions: {
       LOGIN: 'Đăng nhập', LOGIN_GOOGLE: 'Đăng nhập Google', REGISTER: 'Đăng ký', REGISTER_GOOGLE: 'Đăng ký Google',
-      GENERATE: 'Sinh test case', FORGOT_PASSWORD: 'Quên mật khẩu', ADMIN_LOGIN: 'Admin đăng nhập',
+      GENERATE: 'Sinh test case', SRS_UPLOAD: 'Tải tài liệu SRS', FORGOT_PASSWORD: 'Quên mật khẩu', ADMIN_LOGIN: 'Admin đăng nhập',
       ADMIN_CREATE_USER: 'Tạo tài khoản', ADMIN_UPDATE_USER: 'Sửa tài khoản', ADMIN_DELETE_USER: 'Xóa tài khoản',
       ADMIN_LOCK_USER: 'Khóa tài khoản', ADMIN_UNLOCK_USER: 'Mở khóa', ADMIN_RESET_PASSWORD: 'Đặt lại mật khẩu',
       ADMIN_FORCE_LOGOUT: 'Buộc đăng xuất', ADMIN_DISMISS_RESET: 'Bỏ qua yêu cầu', ADMIN_CHANGE_PASSWORD: 'Đổi mật khẩu admin',
@@ -161,7 +161,7 @@ export const adminText = {
     colTime: 'Time', colUser: 'User', colAction: 'Activity', colDetail: 'Details',
     actions: {
       LOGIN: 'Sign in', LOGIN_GOOGLE: 'Google sign-in', REGISTER: 'Sign up', REGISTER_GOOGLE: 'Google sign-up',
-      GENERATE: 'Generate test cases', FORGOT_PASSWORD: 'Forgot password', ADMIN_LOGIN: 'Admin sign-in',
+      GENERATE: 'Generate test cases', SRS_UPLOAD: 'Upload SRS document', FORGOT_PASSWORD: 'Forgot password', ADMIN_LOGIN: 'Admin sign-in',
       ADMIN_CREATE_USER: 'Create account', ADMIN_UPDATE_USER: 'Edit account', ADMIN_DELETE_USER: 'Delete account',
       ADMIN_LOCK_USER: 'Lock account', ADMIN_UNLOCK_USER: 'Unlock account', ADMIN_RESET_PASSWORD: 'Reset password',
       ADMIN_FORCE_LOGOUT: 'Force sign-out', ADMIN_DISMISS_RESET: 'Dismiss request', ADMIN_CHANGE_PASSWORD: 'Change admin password',

@@ -41,6 +41,10 @@ public class TestCaseService {
 
     // Tên model đọc từ biến môi trường GROQ_MODEL (đặt trên Render).
     // Nếu không đặt thì dùng giá trị mặc định phía sau dấu ":".
+    // Địa chỉ API Groq (đổi được để chạy thử với AI giả lập khi kiểm thử)
+    @Value("${GROQ_BASE_URL:https://api.groq.com/openai/v1}")
+    private String groqBaseUrl;
+
     @Value("${GROQ_MODEL:openai/gpt-oss-120b}")
     private String model;
 
@@ -188,7 +192,7 @@ public class TestCaseService {
         if (jsonMode) requestBody.put("response_format", Map.of("type", "json_object"));
 
         return webClient.post()
-                .uri("https://api.groq.com/openai/v1/chat/completions")
+                .uri(groqBaseUrl + "/chat/completions")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY)
                 .bodyValue(mapper.writeValueAsString(requestBody))
@@ -269,6 +273,109 @@ public class TestCaseService {
     }
 
     // =====================================================================
+    // SINH TEST CASE TỪ TÀI LIỆU SRS (từng phần)
+    // =====================================================================
+
+    /**
+     * Sinh test case cho MỘT phần của tài liệu SRS.
+     * sessionId = null -> tạo phiên mới (tên = tên file); ngược lại thêm vào phiên đã có.
+     * Mã REQ / TC được đánh số tiếp nối các phần trước để không bị trùng.
+     */
+    public GenerateResponse generateFromSrsSection(User user, Long sessionId, String fileName, String sectionTitle,
+                                                   String content, String sourceText, String lang) {
+        String systemPrompt = "Ban la mot Senior QA Engineer. Noi dung nguoi dung gui la MOT PHAN cua tai lieu dac ta yeu cau phan mem (SRS) "
+                + "ten \"" + safe(fileName) + "\", muc \"" + safe(sectionTitle) + "\". Nhiem vu: "
+                + "(1) Trich xuat cac yeu cau CO THE KIEM THU trong phan nay (chuc nang, quy tac nghiep vu, rang buoc du lieu, phi chuc nang neu co), "
+                + "danh ma REQ-01, REQ-02, ...; neu tai lieu co ma yeu cau goc (VD: FR-01, UC-02) thi ghi ma goc o dau mo ta trong ngoac vuong. "
+                + "(2) Sinh cac Test Case bao phu TOAN BO cac yeu cau vua trich xuat: moi yeu cau it nhat 1 test case, gom truong hop hop le, "
+                + "khong hop le va gia tri bien. Moi test case ghi ro ma yeu cau no kiem tra trong truong requirementIds. "
+                + "Neu phan nay khong chua yeu cau nao co the kiem thu (VD: muc luc, gioi thieu chung, lich su phien ban) thi tra ve "
+                + "{\"requirements\":[],\"testCases\":[]}. "
+                + "Bat buoc chi tra ve MOT object JSON thuan tuy co dang: "
+                + "{\"requirements\":[{\"id\":\"REQ-01\",\"description\":\"...\",\"priority\":\"High|Medium|Low\"}],"
+                + "\"testCases\":[{\"id\":\"TC-01\",\"summary\":\"...\",\"precondition\":\"...\",\"steps\":[\"...\"],\"expected_result\":\"...\",\"requirementIds\":[\"REQ-01\"]}]}. "
+                + "Khong tra ve markdown hoac loi giai thich. "
+                + languageInstruction(lang);
+
+        try {
+            JsonNode root = callGroqForJson(systemPrompt, "# " + sectionTitle + "\n\n" + content);
+            JsonNode reqNode = root.isArray() ? mapper.createArrayNode() : root.path("requirements");
+            JsonNode tcNode = root.isArray() ? root : (root.has("testCases") ? root.path("testCases") : root.path("test_cases"));
+
+            List<Requirement> requirements = parseRequirements(reqNode);
+            List<TestCase> testCases = new ArrayList<>();
+            if (tcNode.isArray()) {
+                for (JsonNode n : tcNode) testCases.add(mapper.treeToValue(n, TestCase.class));
+            }
+            keepOnlyKnownRequirementCodes(testCases, requirements);
+
+            // 1. Lấy / tạo phiên
+            ChatSession session;
+            if (sessionId == null) {
+                session = new ChatSession();
+                String title = fileName == null || fileName.isBlank() ? "SRS" : fileName.trim();
+                session.setTitle(title.length() > 120 ? title.substring(0, 117) + "..." : title);
+                session.setUserStory(sourceText != null ? sourceText : content);
+                session.setUser(user);
+                session = chatSessionRepository.save(session);
+            } else {
+                session = chatSessionRepository.findById(sessionId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy lịch sử"));
+            }
+
+            // 2. Đánh số tiếp nối các phần trước
+            int maxReq = 0;
+            for (Requirement r : getRequirementsBySession(session.getId())) maxReq = Math.max(maxReq, trailingNumber(r.getCode()));
+            int maxTc = 0;
+            for (TestCase tc : testCaseRepository.findByChatSessionId(session.getId())) maxTc = Math.max(maxTc, trailingNumber(tc.getId()));
+
+            Map<String, String> codeMap = new HashMap<>();
+            for (Requirement r : requirements) {
+                String newCode = String.format("REQ-%02d", ++maxReq);
+                codeMap.put(r.getCode(), newCode);
+                r.setCode(newCode);
+                r.setChatSession(session);
+            }
+            for (TestCase tc : testCases) {
+                tc.setId(String.format("TC-%02d", ++maxTc));
+                List<String> mapped = new ArrayList<>();
+                for (String id : tc.getRequirementIds()) {
+                    String m = codeMap.get(id);
+                    if (m != null) mapped.add(m);
+                }
+                tc.setRequirementIds(mapped);
+                tc.setChatSession(session);
+            }
+
+            List<Requirement> savedReqs = requirementRepository.saveAll(requirements);
+            List<TestCase> savedTcs = testCaseRepository.saveAll(testCases);
+            return new GenerateResponse(session.getId(), savedReqs, savedTcs);
+
+        } catch (WebClientResponseException e) {
+            log.error("Groq từ chối (status {}): {}", e.getStatusCode().value(), e.getResponseBodyAsString(), e);
+            throw new RuntimeException("Groq từ chối (" + e.getStatusCode().value() + "): "
+                    + e.getResponseBodyAsString(), e);
+        } catch (AiFormatException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Lỗi khi sinh test case từ SRS", e);
+            throw new RuntimeException("Lỗi hệ thống: " + e.getMessage(), e);
+        }
+    }
+
+    private static int trailingNumber(String code) {
+        if (code == null) return 0;
+        Matcher m = REQ_NUMBER.matcher(code);
+        try { return m.find() ? Integer.parseInt(m.group(1)) : 0; } catch (NumberFormatException e) { return 0; }
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s.replace("\"", "'").replace("\n", " ");
+    }
+
+    // =====================================================================
     // TRUY VẾT YÊU CẦU & ĐỘ BAO PHỦ
     // =====================================================================
 
@@ -341,7 +448,10 @@ public class TestCaseService {
 
         try {
             ObjectNode input = mapper.createObjectNode();
-            input.put("userStory", session.getUserStory() == null ? "" : session.getUserStory());
+            String story = session.getUserStory() == null ? "" : session.getUserStory();
+            // Tài liệu SRS có thể rất dài -> chỉ gửi phần đầu để không vượt giới hạn của AI
+            if (story.length() > 30000) story = story.substring(0, 30000);
+            input.put("userStory", story);
             ArrayNode tcArr = input.putArray("testCases");
             for (TestCase tc : testCases) {
                 ObjectNode o = tcArr.addObject();

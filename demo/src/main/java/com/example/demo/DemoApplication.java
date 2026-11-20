@@ -47,6 +47,8 @@ public class DemoApplication {
         }
         addColumnIfMissing("chat_session", "user_story", "TEXT");
         addColumnIfMissing("test_cases", "requirement_ids", "TEXT");
+        // Tài liệu SRS có thể dài hơn giới hạn của kiểu TEXT (~64 KB)
+        widenColumn("chat_session", "user_story", "mediumtext", "MEDIUMTEXT");
 
         // ===== Đăng nhập tài khoản / trang quản trị =====
         addColumnIfMissing("users", "username", "VARCHAR(100)");
@@ -73,6 +75,21 @@ public class DemoApplication {
                 "created_at DATETIME(6), " +
                 "handled_at DATETIME(6)" +
                 ")");
+    }
+
+    /** Đổi kiểu cột nếu đang khác kiểu mong muốn (VD: TEXT -> MEDIUMTEXT). */
+    private void widenColumn(String table, String column, String expectedType, String definition) {
+        try {
+            String type = jdbcTemplate.query(
+                    "SELECT DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
+                    rs -> rs.next() ? rs.getString(1) : null, table, column);
+            if (type != null && !type.equalsIgnoreCase(expectedType)) {
+                jdbcTemplate.execute("ALTER TABLE " + table + " MODIFY COLUMN " + column + " " + definition);
+                System.out.println("====== ĐÃ ĐỔI KIỂU CỘT " + table + "." + column + " THÀNH " + definition + " ======");
+            }
+        } catch (Exception e) {
+            System.out.println("====== LỖI KHI ĐỔI KIỂU CỘT " + table + "." + column + ": " + e.getMessage() + " ======");
+        }
     }
 
     private void createTable(String name, String sql) {
