@@ -6,10 +6,11 @@ import { fixText } from './fixText';
 
 const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8080' : '';
 const api = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
-const CHUNK = 12;       // số test case mỗi lượt gọi AI
+const CHUNK = 8;        // số test case mỗi lượt gọi AI (nhỏ để không vượt giới hạn token/phút của Groq miễn phí)
 const MAX_SCAN = 120;   // tối đa test case rà soát trong một lần
 const AUTO_KEY = 'fixAutoApply';
 const defer = (fn) => { queueMicrotask(fn); };
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const CONF = {
   high: { color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
@@ -48,9 +49,22 @@ const words = (s) => (s || '').split(/(\s+)/).filter(x => x !== '');
 const norm = (s) => (s || '').trim().replace(/\s+/g, ' ');
 
 function TextDiff({ before, after }) {
+  const parts = diff(words(before), words(after));
+  const solid = (x) => x.t.trim() !== '';
+  const same = parts.filter(x => x.type === 'same' && solid(x)).length;
+  const longest = Math.max(words(before).filter(w => w.trim()).length, words(after).filter(w => w.trim()).length);
+  // Viết lại gần hết câu -> hiện nguyên câu cũ rồi nguyên câu mới cho dễ đọc
+  if (before && after && longest > 0 && same / longest < 0.5) {
+    return (
+      <span className="fx-rewrite">
+        <span className="fx-del">{before}</span>
+        <span className="fx-add">{after}</span>
+      </span>
+    );
+  }
   return (
     <span>
-      {diff(words(before), words(after)).map((p, k) => (
+      {parts.map((p, k) => (
         <span key={k} className={p.type === 'del' ? 'fx-del' : p.type === 'add' ? 'fx-add' : undefined}>{p.t}</span>
       ))}
     </span>
@@ -151,18 +165,35 @@ export default function FixPanel({ language, sessionId, testCases, hasUnsavedCha
     setLimited(targets.length > MAX_SCAN);
     const list = targets.slice(0, MAX_SCAN);
     setFixes([...found]);
+    let missed = 0;
     for (let i = 0; i < list.length; i += CHUNK) {
+      const part = list.slice(i, i + CHUNK);
       setProgress({ stage: 'ai', done: i, total: list.length });
-      try {
-        const res = await api.post(`/api/sessions/${sessionId}/review/fixes/ai`, {
-          dbIds: list.slice(i, i + CHUNK), excludeDbIds: exclude, lang: language,
-        });
-        (res.data.fixes || []).forEach(f => found.push({ ...f, key: `${f.key}-${i}`, status: 'new' }));
-        setFixes([...found]);
-      } catch (err) {
-        setError(F.failed + errText(err));
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const res = await api.post(`/api/sessions/${sessionId}/review/fixes/ai`, {
+            dbIds: part, excludeDbIds: exclude, lang: language,
+          });
+          (res.data.fixes || []).forEach(f => found.push({ ...f, key: `${f.key}-${i}`, status: 'new' }));
+          setFixes([...found]);
+          break;
+        } catch (err) {
+          const limited = err?.response?.status === 429;
+          if (limited && attempt === 1) {
+            // Groq giới hạn token/phút -> chờ rồi thử lại lượt này một lần
+            const wait = Math.min(60000, Math.max(15000, err.response.data?.retryAfterMs || 0));
+            setProgress({ stage: 'wait', done: i, total: list.length, seconds: Math.round(wait / 1000) });
+            await sleep(wait);
+            setProgress({ stage: 'ai', done: i, total: list.length });
+            continue;
+          }
+          missed += part.length;
+          if (!limited) setError(F.failed + errText(err));
+          break;
+        }
       }
     }
+    if (missed > 0) setError(F.rateLimited(missed));
     setProgress(null);
     if (autoApply) {
       const high = found.filter(f => f.confidence === 'high');
@@ -229,12 +260,12 @@ export default function FixPanel({ language, sessionId, testCases, hasUnsavedCha
             <button className="app-btn" disabled={undoing || busy} onClick={undo}>{undoing ? F.undoing : F.undo(undoCount)}</button>
           )}
           <button className="app-btn app-btn-primary" disabled={busy || allIds.length === 0} onClick={() => { setBanner(''); scan(null); }}>
-            {busy ? <><span className="app-spinner app-spinner-sm" /> {progress.stage === 'dup' ? F.scanDup : F.scanAi(progress.done, progress.total)}</>
+            {busy ? <><span className="app-spinner app-spinner-sm" /> {progress.stage === 'dup' ? F.scanDup : progress.stage === 'wait' ? F.waiting(progress.seconds) : F.scanAi(progress.done, progress.total)}</>
               : F.scanBtn(Math.min(allIds.length, MAX_SCAN))}
           </button>
         </div>
       </div>
-      {busy && progress.stage === 'ai' && progress.total > 0 && (
+      {busy && progress.stage !== 'dup' && progress.total > 0 && (
         <div className="rv-bar"><div style={{ width: Math.round((progress.done / progress.total) * 100) + '%' }} /></div>
       )}
       {limited && <div className="rv-muted" style={{ marginTop: 6 }}>{F.limited(MAX_SCAN)}</div>}
@@ -337,6 +368,7 @@ const fxCss = `
 .fx-stale { color: #b45309; font-size: 12.5px; font-weight: 600; }
 .fx-body { margin-top: 8px; font-size: 13.5px; color: #334155; display: flex; flex-direction: column; gap: 6px; }
 .fx-field { background: #fafbfd; border-radius: 10px; padding: 8px 10px; line-height: 1.6; }
+.fx-rewrite { display: inline-flex; flex-direction: column; gap: 3px; vertical-align: top; }
 .fx-del { background: #fee2e2; color: #991b1b; text-decoration: line-through; border-radius: 3px; margin-right: 3px; }
 .fx-add { background: #dcfce7; color: #166534; border-radius: 3px; }
 .fx-steps { margin: 4px 0 0; padding-left: 22px; }

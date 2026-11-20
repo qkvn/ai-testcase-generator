@@ -159,6 +159,12 @@ public class ReviewController {
         return null;
     }
 
+    @ExceptionHandler(TestCaseService.RateLimitException.class)
+    public ResponseEntity<?> handleRateLimit(TestCaseService.RateLimitException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(Map.of("code", "rate_limit", "message", e.getMessage(), "retryAfterMs", e.getRetryAfterMs()));
+    }
+
     @ExceptionHandler(TestCaseService.AiFormatException.class)
     public ResponseEntity<?> handleAi(TestCaseService.AiFormatException e) {
         return error(HttpStatus.BAD_GATEWAY, "ai_format", e.getMessage());

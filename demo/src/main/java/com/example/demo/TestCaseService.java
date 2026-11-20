@@ -191,20 +191,75 @@ public class TestCaseService {
         requestBody.put("max_tokens", 8000); // Đủ chỗ cho cả yêu cầu + test case (kể cả model có bước suy luận)
         if (jsonMode) requestBody.put("response_format", Map.of("type", "json_object"));
 
-        return webClient.post()
-                .uri(groqBaseUrl + "/chat/completions")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY)
-                .bodyValue(mapper.writeValueAsString(requestBody))
-                .retrieve()
-                .bodyToMono(String.class)
-                // Chỉ thử lại khi lỗi tạm thời (429 hoặc 5xx). Lỗi 400/401/404 thử lại cũng vô ích.
-                .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(2))
-                        .filter(ex -> ex instanceof WebClientResponseException w
-                                && (w.getStatusCode().value() == 429 || w.getStatusCode().is5xxServerError()))
-                        // Hết lượt thử thì ném lại lỗi gốc, không ném "Retries exhausted" nữa
-                        .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
-                .block();
+        String body = mapper.writeValueAsString(requestBody);
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return webClient.post()
+                        .uri(groqBaseUrl + "/chat/completions")
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY)
+                        .bodyValue(body)
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        // Lỗi máy chủ Groq (5xx) -> thử lại sau 2 giây. Lỗi 400/401/404 thử lại cũng vô ích.
+                        .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(2))
+                                .filter(ex -> ex instanceof WebClientResponseException w && w.getStatusCode().is5xxServerError())
+                                // Hết lượt thử thì ném lại lỗi gốc, không ném "Retries exhausted" nữa
+                                .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
+                        .block();
+            } catch (WebClientResponseException e) {
+                if (e.getStatusCode().value() != 429) throw e;
+                // Vượt giới hạn token/phút của Groq -> chờ đúng thời gian Groq yêu cầu rồi thử lại
+                long wait = retryDelayMs(e) + 500;
+                if (attempt >= MAX_RATE_LIMIT_RETRIES || wait > MAX_RATE_LIMIT_WAIT_MS) {
+                    log.warn("Groq giới hạn tốc độ, bỏ cuộc sau {} lần (cần chờ {} ms)", attempt, wait);
+                    throw new RateLimitException(wait);
+                }
+                log.warn("Groq giới hạn tốc độ (lần {}), chờ {} ms rồi thử lại", attempt, wait);
+                Thread.sleep(wait);
+            }
+        }
+    }
+
+    private static final int MAX_RATE_LIMIT_RETRIES = 4;
+    private static final long MAX_RATE_LIMIT_WAIT_MS = 30_000;
+    // VD: "Please try again in 832.5ms" / "in 7.66s" / "in 1m30.5s" / "in 2h3m"
+    private static final Pattern TRY_AGAIN = Pattern.compile(
+            "try again in\\s*(?:(\\d+)h)?(?:(\\d+)m(?!s))?(?:(\\d+(?:\\.\\d+)?)(ms|s))?", Pattern.CASE_INSENSITIVE);
+
+    /** Thời gian Groq yêu cầu chờ (ms): đọc từ thông báo lỗi, nếu không có thì từ header Retry-After. */
+    static long retryDelayMs(WebClientResponseException e) {
+        long ms = parseTryAgainMs(e.getResponseBodyAsString());
+        if (ms > 0) return ms;
+        String header = e.getHeaders().getFirst("retry-after");
+        try {
+            if (header != null) return (long) (Double.parseDouble(header.trim()) * 1000);
+        } catch (NumberFormatException ignored) { /* dùng mặc định */ }
+        return 5_000;
+    }
+
+    static long parseTryAgainMs(String text) {
+        if (text == null) return 0;
+        Matcher m = TRY_AGAIN.matcher(text);
+        if (!m.find()) return 0;
+        double ms = 0;
+        if (m.group(1) != null) ms += Long.parseLong(m.group(1)) * 3_600_000d;
+        if (m.group(2) != null) ms += Long.parseLong(m.group(2)) * 60_000d;
+        if (m.group(3) != null) ms += Double.parseDouble(m.group(3)) * ("ms".equalsIgnoreCase(m.group(4)) ? 1 : 1000);
+        return (long) Math.ceil(ms);
+    }
+
+    /** Groq từ chối vì vượt giới hạn tốc độ (gói miễn phí) dù đã chờ và thử lại. */
+    public static class RateLimitException extends RuntimeException {
+        private final long retryAfterMs;
+
+        public RateLimitException(long retryAfterMs) {
+            super("Groq đang giới hạn tốc độ (gói miễn phí giới hạn số token mỗi phút). Vui lòng thử lại sau khoảng "
+                    + Math.max(1, Math.round(retryAfterMs / 1000.0)) + " giây.");
+            this.retryAfterMs = retryAfterMs;
+        }
+
+        public long getRetryAfterMs() { return retryAfterMs; }
     }
 
     /** Lấy nội dung trả lời của AI và bóc tách phần JSON (object hoặc mảng). */

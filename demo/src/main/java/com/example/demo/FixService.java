@@ -33,7 +33,7 @@ public class FixService {
     static final double NEAR_IDENTICAL = 0.97;
     /** Tóm tắt cũng phải gần giống (tránh gộp nhầm "FR-01 hợp lệ" với "FR-02 hợp lệ" có các bước giống nhau). */
     static final double SUMMARY_THRESHOLD = 0.8;
-    static final int MAX_EXCERPT = 6000;
+    static final int MAX_EXCERPT = 4000; // giữ mỗi lượt gọi AI nhỏ (gói Groq miễn phí: 8.000 token/phút)
     private static final int MAX_SNAPSHOTS = 10;
     private static final Set<String> PROBLEMS = Set.of("wrong", "vague", "steps", "link", "other");
     private static final Pattern TC_NUMBER = Pattern.compile("(\\d+)\\s*$");
