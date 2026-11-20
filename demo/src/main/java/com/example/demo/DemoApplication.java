@@ -66,7 +66,15 @@ public class DemoApplication {
                 "created_at DATETIME(6), " +
                 "INDEX idx_activity_logs_action (action)" +
                 ")");
-        createTable("password_reset_requests", "CREATE TABLE IF NOT EXISTS password_reset_requests (" +
+        createTable("review_snapshots", "CREATE TABLE IF NOT EXISTS review_snapshots (" +
+                "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                "session_id BIGINT, " +
+                "created_at DATETIME(6), " +
+                "summary VARCHAR(255), " +
+                "data MEDIUMTEXT, " +
+                "INDEX idx_review_snapshots_session (session_id)" +
+                ")");
+        createTable("password_reset_requests","CREATE TABLE IF NOT EXISTS password_reset_requests (" +
                 "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
                 "identifier VARCHAR(150), " +
                 "note TEXT, " +

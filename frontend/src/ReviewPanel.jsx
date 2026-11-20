@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { reviewText } from './reviewText';
+import FixPanel from './FixPanel';
 
 // Tab "Đánh giá": kiểm tra tự động bộ test case + AI đề xuất tình huống còn thiếu + "Thêm vào phiên".
 
@@ -21,7 +22,8 @@ const errText = (err) => {
   return (d && (d.message || (typeof d === 'string' ? d : ''))) || err?.message || 'Error';
 };
 
-export default function ReviewPanel({ language, sessionId, readOnly, reloadKey, hasUnsavedChanges, onJump, onAdded }) {
+export default function ReviewPanel({ language, sessionId, readOnly, reloadKey, hasUnsavedChanges, onJump, onAdded,
+  testCases, autoScan, onAutoScanDone, onReplaced }) {
   const R = reviewText[language] || reviewText.vi;
   const [report, setReport] = useState(null);
   const [loadError, setLoadError] = useState('');
@@ -151,6 +153,12 @@ export default function ReviewPanel({ language, sessionId, readOnly, reloadKey, 
             );
           })}
         </div>
+      )}
+
+      {/* ---------- AI rà soát & sửa ---------- */}
+      {!readOnly && (
+        <FixPanel language={language} sessionId={sessionId} testCases={testCases} hasUnsavedChanges={hasUnsavedChanges}
+          autoScan={autoScan} onAutoScanDone={onAutoScanDone} onReplaced={onReplaced} onChanged={load} onJump={onJump} />
       )}
 
       {/* ---------- AI đề xuất ---------- */}

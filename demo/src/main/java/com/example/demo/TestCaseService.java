@@ -57,7 +57,7 @@ public class TestCaseService {
         this.webClient = WebClient.builder().build();
     }
 
-    private static String languageInstruction(String lang) {
+    static String languageInstruction(String lang) {
         return "en".equalsIgnoreCase(lang)
                 ? "BẮT BUỘC TRẢ VỀ KẾT QUẢ BẰNG TIẾNG ANH (ENGLISH)."
                 : "BẮT BUỘC TRẢ VỀ KẾT QUẢ BẰNG TIẾNG VIỆT (VIETNAMESE).";
@@ -144,7 +144,7 @@ public class TestCaseService {
      * - Nếu AI vẫn trả văn bản thường / JSON hỏng -> tự thử lại 1 lần với lời nhắc mạnh hơn.
      * - Nếu model không hỗ trợ JSON mode -> thử lại không dùng JSON mode.
      */
-    private JsonNode callGroqForJson(String systemPrompt, String userContent) throws Exception {
+    JsonNode callGroqForJson(String systemPrompt, String userContent) throws Exception {
         boolean useJsonMode = true;
         Exception lastError = null;
         for (int attempt = 1; attempt <= 3; attempt++) {
@@ -244,7 +244,7 @@ public class TestCaseService {
         return result;
     }
 
-    private static String firstText(JsonNode n, String... fields) {
+    static String firstText(JsonNode n, String... fields) {
         for (String f : fields) {
             JsonNode v = n.get(f);
             if (v != null && !v.isNull()) return v.asText();
@@ -667,7 +667,15 @@ public class TestCaseService {
     }
 
     public List<TestCase> getTestCasesBySession(Long sessionId) {
-        return testCaseRepository.findByChatSessionId(sessionId);
+        return byTcNumber(testCaseRepository.findByChatSessionId(sessionId));
+    }
+
+    /** Sắp test case theo số TC (TC-01, TC-02, ...) để test case được khôi phục khi hoàn tác nằm đúng vị trí. */
+    static List<TestCase> byTcNumber(List<TestCase> list) {
+        List<TestCase> out = new ArrayList<>(list);
+        out.sort(Comparator.comparingInt((TestCase tc) -> trailingNumber(tc.getId()))
+                .thenComparing(TestCase::getDbId, Comparator.nullsLast(Comparator.naturalOrder())));
+        return out;
     }
 
     public void deleteSession(Long sessionId) {

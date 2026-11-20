@@ -247,7 +247,9 @@ function App() {
   const [currentSessionId, setCurrentSessionId] = useState(null); // phiên đang hiển thị (kể cả phiên vừa sinh)
   const [activeTab, setActiveTab] = useState('testcases');
   const [traceBusy, setTraceBusy] = useState(false);
-  const [flashTc, setFlashTc] = useState(null); // test case được tô sáng khi bấm từ tab Đánh giá
+  const [flashTc, setFlashTc] = useState(null);
+  const [autoFix, setAutoFix] = useState(null); // { sessionId, dbIds, nonce }: tự rà soát sau khi tải SRS
+  const srsNewIdsRef = useRef([]); // test case được tô sáng khi bấm từ tab Đánh giá
 
   // Cache dữ liệu từng phiên: mở lại phiên cũ hiển thị ngay, dữ liệu mới được tải ngầm
   const sessionCache = useRef(new Map());
@@ -331,6 +333,7 @@ function App() {
     srsStopRef.current = true;
     setSrsDoc(null);
     setSrsRun(null);
+    setAutoFix(null);
     setActiveSessionId(null);
     setCurrentSessionId(null);
     setTestCases([]);
@@ -393,10 +396,13 @@ function App() {
   }, [currentSessionId, testCases, requirements]);
 
   const handleSelectSession = (sessionId) => {
+    setAutoFix(null);
     fetchTestCasesOnly(sessionId);
   };
 
   // ================== TAB ĐÁNH GIÁ ==================
+  const clearAutoFix = () => setAutoFix(null);
+
   const handleJumpToTc = (dbId) => {
     setActiveTab('testcases');
     setFlashTc(dbId);
@@ -443,12 +449,22 @@ function App() {
     }
   };
 
+  /** Sau khi sinh test case từ SRS: mở tab Đánh giá và tự rà soát trùng / sai cho các test case mới. */
+  const startAutoFix = (sessionId) => {
+    const ids = srsNewIdsRef.current;
+    srsNewIdsRef.current = [];
+    if (!sessionId || ids.length === 0) return;
+    setAutoFix({ sessionId, dbIds: ids, nonce: Date.now() });
+    setActiveTab('review');
+  };
+
   /** Sinh test case lần lượt cho từng phần; phần đầu tạo phiên, các phần sau thêm vào cùng phiên. */
   const handleSrsGenerate = async (sections, isRetry = false) => {
     if (!srsDoc || sections.length === 0) return;
     srsStopRef.current = false;
     if (!isRetry) {
       srsSessionRef.current = null;
+      srsNewIdsRef.current = [];
       setTestCases([]);
       setRequirements([]);
       setCurrentSessionId(null);
@@ -481,6 +497,7 @@ function App() {
         setTestCases(prev => [...prev, ...(res.data.testCases || [])]);
         setRequirements(prev => [...prev, ...(res.data.requirements || [])]);
         tcCount += (res.data.testCases || []).length;
+        for (const tc of res.data.testCases || []) if (tc.dbId) srsNewIdsRef.current.push(tc.dbId);
         setSrsRun(r => ({ ...r, tcCount, sessionId: res.data.sessionId }));
       } catch (err) {
         failed.push({ ...sec, error: srsErrorMessage(err) });
@@ -495,14 +512,16 @@ function App() {
       setSrsDoc(null);
       setSrsRun(null);
       fetchTestCasesOnly(id);
+      startAutoFix(id);
     }
   };
+
 
   const handleSrsViewResult = () => {
     const id = srsSessionRef.current;
     setSrsDoc(null);
     setSrsRun(null);
-    if (id) fetchTestCasesOnly(id);
+    if (id) { fetchTestCasesOnly(id); startAutoFix(id); }
   };
 
   const handleComposerDrop = (e) => {
@@ -1177,6 +1196,10 @@ function App() {
                 hasUnsavedChanges={hasUnsavedChanges}
                 onJump={handleJumpToTc}
                 onAdded={(added) => setTestCases(prev => [...prev, ...added])}
+                testCases={testCases}
+                autoScan={autoFix && autoFix.sessionId === currentSessionId ? autoFix : null}
+                onAutoScanDone={clearAutoFix}
+                onReplaced={(list) => { setTestCases(list); setHasUnsavedChanges(false); }}
               />
             ) : testCases.length > 0 && activeTab === 'trace' ? (
               <TraceabilityPanel

@@ -35,6 +35,11 @@ public class ChatSession {
     @JsonIgnore
     private List<Requirement> requirements;
 
+    // Bản sao trước khi áp dụng đề xuất sửa (để hoàn tác); xóa phiên thì xóa luôn
+    @OneToMany(mappedBy = "chatSession", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<ReviewSnapshot> reviewSnapshots;
+
     // Liên kết với bảng User (Nhiều ChatSession thuộc về 1 User)
     @ManyToOne
     @JoinColumn(name = "user_id")
