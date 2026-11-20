@@ -3,6 +3,8 @@ import axios from 'axios';
 import TraceabilityPanel from './TraceabilityPanel';
 import LandingPage from './LandingPage';
 import SrsPanel from './SrsPanel';
+import ReviewPanel from './ReviewPanel';
+import { reviewText } from './reviewText';
 import { srsText, ACCEPTED_SRS, MAX_SRS_BYTES } from './srsText';
 import { computeCoverage, parseRequirementIds } from './traceability';
 
@@ -245,6 +247,7 @@ function App() {
   const [currentSessionId, setCurrentSessionId] = useState(null); // phiên đang hiển thị (kể cả phiên vừa sinh)
   const [activeTab, setActiveTab] = useState('testcases');
   const [traceBusy, setTraceBusy] = useState(false);
+  const [flashTc, setFlashTc] = useState(null); // test case được tô sáng khi bấm từ tab Đánh giá
 
   // Cache dữ liệu từng phiên: mở lại phiên cũ hiển thị ngay, dữ liệu mới được tải ngầm
   const sessionCache = useRef(new Map());
@@ -392,6 +395,20 @@ function App() {
   const handleSelectSession = (sessionId) => {
     fetchTestCasesOnly(sessionId);
   };
+
+  // ================== TAB ĐÁNH GIÁ ==================
+  const handleJumpToTc = (dbId) => {
+    setActiveTab('testcases');
+    setFlashTc(dbId);
+  };
+
+  useEffect(() => {
+    if (flashTc == null || activeTab !== 'testcases') return undefined;
+    const row = document.getElementById('tc-row-' + flashTc);
+    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timer = setTimeout(() => setFlashTc(null), 2400);
+    return () => clearTimeout(timer);
+  }, [flashTc, activeTab]);
 
   // ================== TẢI TÀI LIỆU SRS ==================
   const srsT = srsText[language] || srsText.vi;
@@ -1133,7 +1150,7 @@ function App() {
 
             {testCases.length > 0 && (
               <div className="app-tabs">
-                {[['testcases', t.tabTestCases], ['trace', t.tabTrace]].map(([key, label]) => {
+                {[['testcases', t.tabTestCases], ['trace', t.tabTrace], ['review', (reviewText[language] || reviewText.vi).tab]].map(([key, label]) => {
                   const cov = key === 'trace' && requirements.length > 0 ? computeCoverage(requirements, testCases) : null;
                   return (
                     <button key={key} onClick={() => setActiveTab(key)} className={'app-tab' + (activeTab === key ? ' active' : '')}>
@@ -1150,6 +1167,17 @@ function App() {
                 <div style={{ fontWeight: 600, marginTop: '14px', color: '#212529' }}>{t.generatingTitle}</div>
                 <div style={{ fontSize: '14px', marginTop: '4px' }}>{t.generatingSub}</div>
               </div>
+            ) : testCases.length > 0 && activeTab === 'review' && currentSessionId ? (
+              <ReviewPanel
+                key={currentSessionId}
+                language={language}
+                sessionId={currentSessionId}
+                readOnly={isSharedView}
+                reloadKey={testCases.length}
+                hasUnsavedChanges={hasUnsavedChanges}
+                onJump={handleJumpToTc}
+                onAdded={(added) => setTestCases(prev => [...prev, ...added])}
+              />
             ) : testCases.length > 0 && activeTab === 'trace' ? (
               <TraceabilityPanel
                 t={t}
@@ -1184,7 +1212,7 @@ function App() {
                   </thead>
                   <tbody>
                     {testCases.map((tc, index) => (
-                      <tr key={tc.dbId || index}>
+                      <tr key={tc.dbId || index} id={'tc-row-' + (tc.dbId || index)} className={flashTc != null && flashTc === tc.dbId ? 'app-row-flash' : ''}>
                         <td><span className="app-tc-id">{tc.id}</span></td>
                         <td style={{ fontWeight: 500 }}>{renderEditableCell(tc, 'summary')}</td>
                         <td>{renderEditableCell(tc, 'precondition')}</td>
@@ -1307,6 +1335,8 @@ const appCss = `
 .app-table tbody tr { transition: background .15s; }
 .app-table tbody tr:hover { background: #fafbfd; }
 .app-table tbody tr:last-child td { border-bottom: none; }
+@keyframes app-flash { 0%, 100% { background: transparent; } 15%, 65% { background: #fff1c7; } }
+.app-table tbody tr.app-row-flash, .app-table tbody tr.app-row-flash:hover { animation: app-flash 2.3s ease-in-out; }
 .app-tc-id { display: inline-block; color: var(--brand); font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--brand-soft); margin-top: 3px; white-space: nowrap; }
 
 /* ----- Modal ----- */

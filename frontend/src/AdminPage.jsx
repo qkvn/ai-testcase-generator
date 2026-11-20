@@ -478,7 +478,7 @@ function Users({ T, language, me, notify, refreshKey, onChanged }) {
 
 // ---------------- Nhật ký hoạt động ----------------
 const ACTION_COLORS = {
-  LOGIN: 'blue', LOGIN_GOOGLE: 'blue', REGISTER: 'green', REGISTER_GOOGLE: 'green', GENERATE: 'orange', SRS_UPLOAD: 'orange',
+  LOGIN: 'blue', LOGIN_GOOGLE: 'blue', REGISTER: 'green', REGISTER_GOOGLE: 'green', GENERATE: 'orange', SRS_UPLOAD: 'orange', AI_REVIEW: 'orange', REVIEW_ADD: 'green',
   FORGOT_PASSWORD: 'yellow', ADMIN_LOGIN: 'purple', ADMIN_DELETE_USER: 'red', ADMIN_LOCK_USER: 'red', ADMIN_FORCE_LOGOUT: 'red',
 };
 

@@ -376,6 +376,113 @@ public class TestCaseService {
     }
 
     // =====================================================================
+    // RÀ SOÁT: AI ĐỀ XUẤT TÌNH HUỐNG CÒN THIẾU & THÊM TEST CASE VÀO PHIÊN
+    // =====================================================================
+
+    /** Một test case AI đề xuất bổ sung (chưa lưu). type: error | boundary | invalid | security | other */
+    public record Suggestion(String requirementId, String type, String reason, String summary, String precondition,
+                             List<String> steps, String expected_result) {}
+
+    private static final Set<String> SUGGESTION_TYPES = Set.of("error", "boundary", "invalid", "security", "other");
+
+    /**
+     * AI đọc từng yêu cầu cùng các test case đã có và đề xuất tình huống còn thiếu
+     * (trường hợp lỗi, giá trị biên, dữ liệu không hợp lệ, phân quyền...). Không lưu vào DB.
+     */
+    public List<Suggestion> suggestMissingTests(Long sessionId, List<String> requirementCodes, String lang) {
+        List<Requirement> all = getRequirementsBySession(sessionId);
+        Set<String> wanted = new HashSet<>(requirementCodes == null ? List.of() : requirementCodes);
+        List<Requirement> targets = all.stream().filter(r -> wanted.contains(r.getCode())).toList();
+        if (targets.isEmpty()) return List.of();
+        List<TestCase> testCases = testCaseRepository.findByChatSessionId(sessionId);
+
+        String systemPrompt = "Ban la mot Senior QA Engineer dang ra soat bo test case. Voi MOI yeu cau duoc gui, hay doc cac test case DA CO "
+                + "va de xuat toi da 3 test case CON THIEU, uu tien: truong hop loi / ngoai le (error), gia tri bien (boundary), "
+                + "du lieu khong hop le (invalid), phan quyen / bao mat (security). "
+                + "TUYET DOI khong de xuat tinh huong trung hoac gan giong test case da co. Neu yeu cau da duoc kiem thu day du thi khong de xuat. "
+                + "Truong reason giai thich ngan gon vi sao can them test case nay. "
+                + "Bat buoc chi tra ve MOT object JSON thuan tuy co dang: "
+                + "{\"suggestions\":[{\"requirementId\":\"REQ-01\",\"type\":\"error|boundary|invalid|security|other\",\"reason\":\"...\","
+                + "\"summary\":\"...\",\"precondition\":\"...\",\"steps\":[\"...\"],\"expected_result\":\"...\"}]}. "
+                + "Khong tra ve markdown hoac loi giai thich. "
+                + languageInstruction(lang);
+
+        try {
+            ObjectNode input = mapper.createObjectNode();
+            ArrayNode reqArr = input.putArray("requirements");
+            for (Requirement r : targets) {
+                ObjectNode o = reqArr.addObject();
+                o.put("id", r.getCode());
+                o.put("description", r.getDescription());
+                o.put("priority", r.getPriority());
+                ArrayNode existing = o.putArray("existingTestCases");
+                for (TestCase tc : testCases) {
+                    if (!tc.getRequirementIds().contains(r.getCode())) continue;
+                    ObjectNode t = existing.addObject();
+                    t.put("id", tc.getId());
+                    t.put("summary", tc.getSummary());
+                    t.put("expected_result", tc.getExpected_result());
+                }
+            }
+
+            JsonNode root = callGroqForJson(systemPrompt, mapper.writeValueAsString(input));
+            JsonNode arr = root.isArray() ? root : root.path("suggestions");
+            List<Suggestion> result = new ArrayList<>();
+            Map<String, Integer> perReq = new HashMap<>();
+            for (JsonNode n : arr) {
+                String reqId = firstText(n, "requirementId", "requirement_id", "requirement");
+                reqId = reqId == null ? "" : reqId.trim().toUpperCase(Locale.ROOT);
+                String summary = firstText(n, "summary", "title");
+                if (!wanted.contains(reqId) || summary == null || summary.isBlank()) continue;
+                if (perReq.merge(reqId, 1, Integer::sum) > 3) continue;
+                String type = firstText(n, "type");
+                type = type == null ? "other" : type.trim().toLowerCase(Locale.ROOT);
+                if (!SUGGESTION_TYPES.contains(type)) type = "other";
+                List<String> steps = new ArrayList<>();
+                JsonNode st = n.path("steps");
+                if (st.isArray()) st.forEach(x -> { if (!x.asText().isBlank()) steps.add(x.asText()); });
+                else if (st.isTextual() && !st.asText().isBlank()) steps.add(st.asText());
+                result.add(new Suggestion(reqId, type, firstText(n, "reason"), summary.trim(),
+                        firstText(n, "precondition"), steps, firstText(n, "expected_result", "expectedResult")));
+            }
+            return result;
+        } catch (WebClientResponseException e) {
+            log.error("Groq từ chối (status {}): {}", e.getStatusCode().value(), e.getResponseBodyAsString(), e);
+            throw new RuntimeException("Groq từ chối (" + e.getStatusCode().value() + "): " + e.getResponseBodyAsString(), e);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Lỗi khi AI đề xuất test case", e);
+            throw new RuntimeException("Lỗi hệ thống: " + e.getMessage(), e);
+        }
+    }
+
+    /** Thêm test case vào phiên: đánh số TC tiếp nối, chỉ giữ liên kết tới yêu cầu có trong phiên. */
+    public List<TestCase> addTestCases(Long sessionId, List<TestCase> items) {
+        ChatSession session = chatSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy lịch sử"));
+        Set<String> known = new HashSet<>();
+        getRequirementsBySession(sessionId).forEach(r -> known.add(r.getCode()));
+        int maxTc = 0;
+        for (TestCase tc : testCaseRepository.findByChatSessionId(sessionId)) maxTc = Math.max(maxTc, trailingNumber(tc.getId()));
+
+        List<TestCase> toSave = new ArrayList<>();
+        for (TestCase in : items) {
+            if (in.getSummary() == null || in.getSummary().isBlank()) continue;
+            TestCase tc = new TestCase();
+            tc.setId(String.format("TC-%02d", ++maxTc));
+            tc.setSummary(in.getSummary().trim());
+            tc.setPrecondition(in.getPrecondition());
+            tc.setSteps(in.getSteps() == null ? new ArrayList<>() : new ArrayList<>(in.getSteps()));
+            tc.setExpected_result(in.getExpected_result());
+            tc.setRequirementIds(in.getRequirementIds().stream().filter(known::contains).toList());
+            tc.setChatSession(session);
+            toSave.add(tc);
+        }
+        return testCaseRepository.saveAll(toSave);
+    }
+
+    // =====================================================================
     // TRUY VẾT YÊU CẦU & ĐỘ BAO PHỦ
     // =====================================================================
 
